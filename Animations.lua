@@ -70,7 +70,7 @@ local function TypeName(text)
   if not text or not text.SetAlphaGradient then return 0 end
   local value = text:GetText()
   if type(value) ~= "string" or (issecretvalue and issecretvalue(value)) then return 0 end
-  local length = #value
+  local _, length = value:gsub("[^\128-\191]", "") -- letters, not bytes (accented letters take more)
   local duration = length / TYPE_SPEED
   text:SetAlphaGradient(0, TYPE_SOFTNESS)
   Run(function (elapsed)

@@ -232,7 +232,9 @@ end)
 local function VisibleLength(value)
   local plain = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn.-:", ""):gsub("|r", "")
     :gsub("|H.-|h(.-)|h", "%1"):gsub("|T.-|t", "x"):gsub("|A.-|a", "x")
-  return math.max(1, #plain)
+  -- Letters, not bytes: accented, Cyrillic or Asian letters take 2 to 3 bytes
+  local _, letters = plain:gsub("[^\128-\191]", "")
+  return math.max(1, letters)
 end
 
 local function Snap(picture)
