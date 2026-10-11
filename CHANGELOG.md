@@ -13,6 +13,7 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - In dungeons and raids: like outside, hide the tracker, or always show it (`Fade.lua`).
 - Sound on complete: a sound when an objective is done and another when a quest is ready to turn in (`Sounds.lua`).
 - Animations (Glass, Game or Off, each Glass one on its own): titles light up with a thin line and a shine, objective progress line, completed objectives flash white, the "?" of quests ready to turn in pulses, the tracker slides in, and new quests slide in, write their name, pop their icon with a ring and show their objectives one by one (`Skin.lua`, `Icons.lua`, `Animations.lua`, `Fade.lua`).
+- Update notice: the addon quietly tells other players in your guild and group which version it has; if someone has a newer one, a message in chat says so (once per session) (`VersionCheck.lua`).
 - `/gft debug` and `/gft testanim` to help find problems.
 
 ### Fixed
