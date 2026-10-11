@@ -44,10 +44,31 @@ local function CreateIcon(button, size)
   icon:SetPoint("CENTER")
   button.gftIcon = icon
 
+  -- The outline: the icon's shape a little bigger, in black, behind it
+  local outline = button:CreateTexture(nil, "OVERLAY", nil, 6)
+  outline:SetSize(size, size)
+  outline:SetPoint("CENTER")
+  outline:SetVertexColor(0, 0, 0, 0.9)
+  outline:Hide()
+  button.gftOutline = outline
+
   -- The frame's own HookScript (secure)
   button:HookScript("OnEnter", function () button.gftHover = true; button:gftUpdate() end)
   button:HookScript("OnLeave", function () button.gftHover = false; button:gftUpdate() end)
   return icon
+end
+
+-- Shows a Glass icon (and its outline, with the option on), or hides them
+local function ShowIcon(button, name)
+  if name then
+    button.gftIcon:SetTexture(ASSETS..name)
+    button.gftIcon:Show()
+    button.gftOutline:SetTexture(ASSETS..name.."Outline")
+    button.gftOutline:SetShown(Core.db.profile.iconOutline)
+  else
+    button.gftIcon:Hide()
+    button.gftOutline:Hide()
+  end
 end
 
 local LIGHTER = 0.55 -- how much white is mixed in on the followed quest
@@ -138,6 +159,8 @@ animator:SetScript("OnUpdate", function ()
     local size = ICON_SIZE * math.min(scale, MAX_SCALE)
     button.gftIcon:SetSize(size, size)
     button.gftIcon:SetAlpha(alpha)
+    button.gftOutline:SetSize(size, size)
+    button.gftOutline:SetAlpha(alpha)
 
     if not (state.pulse or state.pop or state.ring) then
       animated[button] = nil
@@ -177,11 +200,10 @@ local function UpdatePoi(button)
   end
 
   if styled then
-    button.gftIcon:SetTexture(ASSETS..icon)
-    button.gftIcon:Show()
+    ShowIcon(button, icon)
     SetIconColor(button, button:IsSelected())
   else
-    button.gftIcon:Hide()
+    ShowIcon(button, nil)
   end
 
   -- A quest ready to turn in: the "?" pulses gently until it's turned in
@@ -211,7 +233,7 @@ end
 local function PopIcon(button)
   if not button or not button.gftIcon or not button.gftStyled then return end
   if not button.gftRing then
-    local ring = button:CreateTexture(nil, "OVERLAY", nil, 6)
+    local ring = button:CreateTexture(nil, "OVERLAY", nil, 5)
     ring:SetTexture(ASSETS.."ring")
     ring:SetBlendMode("ADD")
     ring:SetPoint("CENTER")
@@ -241,11 +263,10 @@ local function UpdateMinimize(button)
   end
 
   if styled then
-    button.gftIcon:SetTexture(ASSETS..(collapsed and "expand" or "collapse"))
-    button.gftIcon:Show()
+    ShowIcon(button, collapsed and "expand" or "collapse")
     SetIconColor(button, false)
   else
-    button.gftIcon:Hide()
+    ShowIcon(button, nil)
   end
 end
 
@@ -271,9 +292,17 @@ end
 
 local QUEST_NAMES = {}
 
+-- The game's own color and text of each name are remembered (as the game or
+-- another addon sets them), so "Game colors" can put them back right away.
+
 local function ApplyQuestNameColor(text)
   local r, g, b = Core:Color(Core.db.profile.questNameColor)
-  if not r then return end -- "auto": the game's colors
+  local game = text.gftGameColor
+  if not r then
+    -- "auto": back to the game's color
+    if not game then return end
+    r, g, b = game[1], game[2], game[3]
+  end
   text.gftColoring = true
   text:SetTextColor(r, g, b)
   text.gftColoring = false
@@ -281,26 +310,42 @@ end
 
 -- Other addons can put a color inside the text itself (e.g. the quest level
 -- in its difficulty color), which wins over any text color: with a chosen
--- color, those inline colors are taken out
+-- color, those inline colors are taken out (and put back with "Game colors")
 local function StripInlineColors(text)
-  if not Core:Color(Core.db.profile.questNameColor) then return end
-  local value = text:GetText()
-  if type(value) ~= "string" or (issecretvalue and issecretvalue(value)) then return end
-  if not value:find("|c") then return end
-  local plain = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn.-:", ""):gsub("|r", "")
+  local value = text.gftGameText
+  if type(value) ~= "string" then return end
+  local shown = value
+  if Core:Color(Core.db.profile.questNameColor) and value:find("|c") then
+    shown = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn.-:", ""):gsub("|r", "")
+  end
+  if text:GetText() == shown then return end
   text.gftColoring = true
-  text:SetText(plain)
+  text:SetText(shown)
   text.gftColoring = false
+end
+
+local function Readable(value)
+  return value ~= nil and not (issecretvalue and issecretvalue(value))
 end
 
 local function ColorQuestName(text)
   if not text or QUEST_NAMES[text] then return end
   QUEST_NAMES[text] = true
-  hooksecurefunc(text, "SetTextColor", function ()
-    if not text.gftColoring then ApplyQuestNameColor(text) end
+
+  local r, g, b = text:GetTextColor()
+  if Readable(r) then text.gftGameColor = { r, g, b } end
+  local value = text:GetText()
+  if Readable(value) then text.gftGameText = value end
+
+  hooksecurefunc(text, "SetTextColor", function (_, nr, ng, nb)
+    if text.gftColoring then return end
+    if Readable(nr) then text.gftGameColor = { nr, ng, nb } end
+    ApplyQuestNameColor(text)
   end)
-  hooksecurefunc(text, "SetText", function ()
-    if not text.gftColoring then StripInlineColors(text) end
+  hooksecurefunc(text, "SetText", function (_, newValue)
+    if text.gftColoring then return end
+    text.gftGameText = Readable(newValue) and newValue or nil
+    StripInlineColors(text)
   end)
   StripInlineColors(text)
   ApplyQuestNameColor(text)
@@ -358,7 +403,7 @@ Core:OnChange(function (key, ...)
       StylePoi(block.poiButton)
       PopIcon(block.poiButton)
     end
-  elseif key == "glassLook" or key == "iconColor" or key == "sectionAnimation" or key == "animPulse" or key == "profile" then
+  elseif key == "glassLook" or key == "iconColor" or key == "iconOutline" or key == "sectionAnimation" or key == "animPulse" or key == "profile" then
     UpdateAll()
   end
   if key == "questNameColor" or key == "profile" then

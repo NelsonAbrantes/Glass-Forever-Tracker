@@ -185,6 +185,7 @@ local function Build()
     "Color of the quest names. Game colors: as the game (or another addon) colors them, e.g. by difficulty")
   Dropdown(category, "iconColor", "Icons", ColorChoices({ { "game", "Game icons" } }),
     "Color of the quest icons (\"?\" and \"...\") and the minimize buttons. Game icons: the game's own round icons")
+  Checkbox(category, "iconOutline", "Icon outline", "A dark outline around the Glass icons, so they stand out on any background")
   Checkbox(category, "glassBars", "Glass progress bars", "Progress bars (shown by some objectives) as a flat bar in the section title color, without the game's frame")
   Dropdown(category, "completedObjectives", "Completed objectives", {
     { "show", "Show" },

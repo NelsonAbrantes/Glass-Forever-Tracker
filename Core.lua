@@ -65,6 +65,7 @@ Core.defaults = {
     titleColor = "gold",      -- section titles ("Quests"); see Core.COLORS
     questNameColor = "auto",  -- quest names; "auto" keeps the game's colors
     iconColor = "gold",       -- quest and minimize icons; "game" = the game's own
+    iconOutline = true,       -- a dark outline around the Glass icons
     hideMainHeader = false,   -- hide the "All Objectives" title
     hideSectionHeaders = false, -- hide the section titles ("Quests"...)
 
