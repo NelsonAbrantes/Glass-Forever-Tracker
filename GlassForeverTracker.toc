@@ -28,6 +28,7 @@ Sounds.lua
 ZoneFilter.lua
 Extras.lua
 Animations.lua
+Dust.lua
 VersionCheck.lua
 Options.lua
 EditMode.lua

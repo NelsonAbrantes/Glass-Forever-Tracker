@@ -212,6 +212,7 @@ local function Build()
   Checkbox(category, "animQuestType", "New quest name writes itself", "A new quest's name appears letter by letter")
   Checkbox(category, "animQuestIcon", "New quest icon pops", "A new quest's icon pops and a soft ring opens around it")
   Checkbox(category, "animQuestLines", "New quest objectives one by one", "A new quest's objectives appear one after the other")
+  Checkbox(category, "animAbandon", "Abandoned quest turns to dust", "When you abandon a quest, it turns to dust and blows away, letter by letter")
 
   Header(layout, "Background")
   Slider(category, "backgroundOpacity", "Background opacity", 0, 1, 0.05, "Opacity of the Glass background behind the tracker. 0 turns it off. The Opacity setting in Edit Mode changes it too")

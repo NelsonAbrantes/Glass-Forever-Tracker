@@ -13,6 +13,18 @@ local function RoundTo2(value)
   return math.floor(value * 100 + 0.5) / 100
 end
 
+-- The colors from Core.COLORS as dropdown entries, after any extra ones
+local function ColorValues(extra)
+  local values = {}
+  for _, entry in ipairs(extra or {}) do
+    table.insert(values, entry)
+  end
+  for _, entry in ipairs(Core.COLORS) do
+    table.insert(values, { text = entry[2], value = entry[1] })
+  end
+  return values
+end
+
 local function Setup()
   local LEM = LibStub("LibEditMode", true)
   local system = _G.Enum and _G.Enum.EditModeSystem and _G.Enum.EditModeSystem.ObjectiveTracker
@@ -53,6 +65,82 @@ local function Setup()
       default = defaults.glassLook,
       get = function () return profile().glassLook end,
       set = function (_, value) Set("glassLook", value) end,
+    },
+    {
+      name = "Faded visibility",
+      desc = "How visible the tracker stays when faded. 0 hides it completely",
+      kind = LEM.SettingType.Slider,
+      default = defaults.fadedAlpha,
+      minValue = 0,
+      maxValue = 0.8,
+      valueStep = 0.05,
+      formatter = RoundTo2,
+      get = function () return profile().fadedAlpha end,
+      set = function (_, value) Set("fadedAlpha", RoundTo2(value)) end,
+    },
+    {
+      name = "Title size",
+      desc = "Size of the section titles and quest names. Text Size (above) sets it 2 bigger than the objectives; this fine-tunes it",
+      kind = LEM.SettingType.Slider,
+      default = defaults.headerFontSize,
+      minValue = 8,
+      maxValue = 24,
+      valueStep = 1,
+      get = function () return profile().headerFontSize end,
+      set = function (_, value) Set("headerFontSize", value) end,
+    },
+    {
+      name = "Line spacing",
+      desc = "Extra space between the lines of a text that takes more than one line",
+      kind = LEM.SettingType.Slider,
+      default = defaults.lineSpacing,
+      minValue = 0,
+      maxValue = 10,
+      valueStep = 1,
+      get = function () return profile().lineSpacing end,
+      set = function (_, value) Set("lineSpacing", value) end,
+    },
+    {
+      name = "Background size",
+      desc = "How far the Glass background reaches past the text, where it fades out",
+      kind = LEM.SettingType.Slider,
+      default = defaults.backgroundSize,
+      minValue = 0,
+      maxValue = 80,
+      valueStep = 2,
+      get = function () return profile().backgroundSize end,
+      set = function (_, value) Set("backgroundSize", value) end,
+    },
+    {
+      name = "Background color",
+      kind = LEM.SettingType.Dropdown,
+      default = defaults.backgroundColor,
+      values = {
+        { text = "Black", value = "black" },
+        { text = "Dark brown", value = "brown" },
+        { text = "Dark blue", value = "blue" },
+        { text = "Dark grey", value = "grey" },
+      },
+      get = function () return profile().backgroundColor end,
+      set = function (_, value) Set("backgroundColor", value) end,
+    },
+    {
+      name = "Title color",
+      desc = "Color of the section titles",
+      kind = LEM.SettingType.Dropdown,
+      default = defaults.titleColor,
+      values = ColorValues(),
+      get = function () return profile().titleColor end,
+      set = function (_, value) Set("titleColor", value) end,
+    },
+    {
+      name = "Icon color",
+      desc = "Color of the quest icons and minimize buttons. Game icons: the game's own",
+      kind = LEM.SettingType.Dropdown,
+      default = defaults.iconColor,
+      values = ColorValues({ { text = "Game icons", value = "game" } }),
+      get = function () return profile().iconColor end,
+      set = function (_, value) Set("iconColor", value) end,
     },
   })
 

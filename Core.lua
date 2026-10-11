@@ -83,6 +83,7 @@ Core.defaults = {
     animQuestType = true,     -- a new quest's name writes itself
     animQuestIcon = true,     -- a new quest's icon pops, with a ring
     animQuestLines = true,    -- a new quest's objectives appear one by one
+    animAbandon = true,       -- an abandoned quest turns to dust
 
     -- Behavior
     zoneOnly = false,         -- track only the quests of the current zone
