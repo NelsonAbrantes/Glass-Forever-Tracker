@@ -152,6 +152,7 @@ animator:SetScript("OnUpdate", function ()
         button.gftRing:SetAlpha(0.9 * (1 - k))
       else
         button.gftRing:SetAlpha(0)
+        button.gftRing:Hide()
         state.ring = nil
       end
     end
@@ -207,7 +208,7 @@ local function UpdatePoi(button)
   end
 
   -- A quest ready to turn in: the "?" pulses gently until it's turned in
-  Animate(button, "pulse", styled and icon == "questComplete" and Core:Animates("animPulse"))
+  Animate(button, "pulse", styled and icon == "questComplete" and Core:Animates())
 end
 
 local function StylePoi(button)
@@ -225,7 +226,35 @@ local function StylePoi(button)
   -- The game changes the icon when a quest is completed or followed
   hooksecurefunc(button, "UpdateButtonStyle", UpdatePoi)
   hooksecurefunc(button, "SetSelected", UpdatePoi)
+  -- Other moments the game touches its art (when reused for another quest,
+  -- its transparency, its highlight...): hide it again after each
+  for _, method in ipairs({ "UpdateButtonAlpha", "EvaluateManagedHighlight", "UpdateSelected", "SetStyle", "Reset" }) do
+    if button[method] then hooksecurefunc(button, method, UpdatePoi) end
+  end
+  button:HookScript("OnShow", UpdatePoi)
   UpdatePoi(button)
+end
+
+-- Safety check, from the regular scan: the game's art of a quest icon must
+-- stay hidden while it uses the Glass icon, and the icon must match its quest
+local function EnforcePoi(button)
+  -- A ring left over after its animation
+  if button.gftRing and button.gftRing:IsShown() and not (animated[button] and animated[button].ring) then
+    button.gftRing:SetAlpha(0)
+    button.gftRing:Hide()
+  end
+  local wanted = GlassLook() and PoiIcon(button:GetStyle()) and true or false
+  if wanted ~= button.gftStyled then
+    UpdatePoi(button)
+    return
+  end
+  if not wanted then return end
+  for _, region in ipairs({ button.NormalTexture, button.PushedTexture, button.HighlightTexture, button.Glow, button.Display }) do
+    if region and region:GetAlpha() > 0.001 then
+      UpdatePoi(button)
+      return
+    end
+  end
 end
 
 -- A quest just added (Animations: Glass): its icon pops (grows past its size
@@ -242,6 +271,7 @@ local function PopIcon(button)
   end
   local r, g, b = button.gftIcon:GetVertexColor()
   button.gftRing:SetVertexColor(r, g, b)
+  button.gftRing:Show()
   Animate(button, "pop", true)
   Animate(button, "ring", true)
 end
@@ -351,6 +381,22 @@ local function ColorQuestName(text)
   ApplyQuestNameColor(text)
 end
 
+-- For /gft debug: the state of each quest icon
+function Core:IconsDetails()
+  local function Part(region)
+    if not region then return "-" end
+    return string.format("%s/%.2f", region:IsShown() and "shown" or "hidden", region:GetAlpha())
+  end
+  for button in pairs(POI_ICONS) do
+    if button:IsVisible() then
+      print(string.format("  icon style %s glass %s | normal %s glow %s highlight %s display %s | ours %s ring %s",
+        tostring(button:GetStyle()), tostring(button.gftStyled),
+        Part(button.NormalTexture), Part(button.Glow), Part(button.HighlightTexture), Part(button.Display),
+        Part(button.gftIcon), Part(button.gftRing)))
+    end
+  end
+end
+
 -- For /gft debug
 function Core:IconsDebug()
   local pois, names = 0, 0
@@ -369,7 +415,9 @@ local function Scan()
     StyleMinimize(module.Header)
     for _, blocks in pairs(module.usedBlocks or {}) do
       for _, block in pairs(blocks) do
-        if block.poiButton and not POI_ICONS[block.poiButton] then
+        if block.poiButton and POI_ICONS[block.poiButton] then
+          EnforcePoi(block.poiButton)
+        elseif block.poiButton then
           StylePoi(block.poiButton)
         end
         ColorQuestName(block.HeaderText)
@@ -399,11 +447,11 @@ Core:OnChange(function (key, ...)
     Scan() -- the icons of a new section, without waiting for the next check
   elseif key == "questAdded" then
     local block = ...
-    if block and block.poiButton and Core:Animates("animQuestIcon") then
+    if block and block.poiButton and Core:Animates() then
       StylePoi(block.poiButton)
       PopIcon(block.poiButton)
     end
-  elseif key == "glassLook" or key == "iconColor" or key == "iconOutline" or key == "sectionAnimation" or key == "animPulse" or key == "profile" then
+  elseif key == "glassLook" or key == "iconColor" or key == "iconOutline" or key == "sectionAnimation" or key == "profile" then
     UpdateAll()
   end
   if key == "questNameColor" or key == "profile" then

@@ -278,7 +278,7 @@ events:SetScript("OnEvent", function (_, event, questID)
     if turned and GetTime() - turned < 2 then return end
     -- Abandoned: the game takes it out of the tracker a moment after this,
     -- so the picture is taken now, while it's still there
-    if Core:Animates("animAbandon") then
+    if Core:Animates() then
       -- A problem here shows once and never stops the game's own handling
       local ok, problem = pcall(function ()
         local picture = TakePicture(questID)

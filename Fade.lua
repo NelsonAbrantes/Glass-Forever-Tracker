@@ -70,7 +70,7 @@ end
 
 local slides
 local function SlideIn()
-  if not Core:Animates("animTrackerSlide") or InCombatLockdown() or InEditMode() then return end
+  if not Core:Animates() or InCombatLockdown() or InEditMode() then return end
   slides = slides or { SlideGroup(tracker), SlideGroup(Core.background) }
   for _, group in ipairs(slides) do
     group:Stop()

@@ -7,6 +7,7 @@ local C_Timer = C_Timer
 local CreateFrame = CreateFrame
 local GetRealZoneText = GetRealZoneText
 local InCombatLockdown = InCombatLockdown
+local IsInInstance = IsInInstance
 -- luacheck: pop
 
 ----
@@ -17,7 +18,8 @@ local InCombatLockdown = InCombatLockdown
 -- zone or accept a quest. The quests stay in your quest log. It's like
 -- clicking them yourself, which the game only allows out of combat, so in
 -- combat it waits until the fight is over. Turning it off tracks again the
--- quests it had stopped tracking.
+-- quests it had stopped tracking. The same happens inside a dungeon or raid
+-- with "In dungeons and raids: Dungeon quests only".
 
 local function Profile() return Core.db.profile end
 
@@ -25,6 +27,17 @@ local function Profile() return Core.db.profile end
 local function Untracked()
   Core.db.char.zoneUntracked = Core.db.char.zoneUntracked or {}
   return Core.db.char.zoneUntracked
+end
+
+-- The filter runs with "Only quests in this zone" on, or inside a dungeon or
+-- raid with "In dungeons and raids: Dungeon quests only". Inside, the
+-- zone is the dungeon itself.
+local function Active()
+  local profile = Profile()
+  if profile.zoneOnly then return true end
+  if profile.instanceMode ~= "dungeon" then return false end
+  local inInstance, instanceType = IsInInstance()
+  return inInstance and (instanceType == "party" or instanceType == "raid") or false
 end
 
 local function IsTracked(questID)
@@ -43,7 +56,7 @@ local function Apply()
   local untracked = Untracked()
 
   -- Off: give back what it took
-  if not Profile().zoneOnly then
+  if not Active() then
     for questID in pairs(untracked) do
       if C_QuestLog.GetLogIndexForQuestID(questID) and not IsTracked(questID) then
         C_QuestLog.AddQuestWatch(questID)
@@ -94,7 +107,7 @@ events:SetScript("OnEvent", function (_, event)
       pendingCombat = false
       ApplySoon()
     end
-  elseif Profile().zoneOnly then
+  else
     ApplySoon()
   end
 end)
@@ -106,7 +119,7 @@ Core:OnChange(function (key)
     events:RegisterEvent("QUEST_ACCEPTED")
     events:RegisterEvent("PLAYER_REGEN_ENABLED")
     ApplySoon()
-  elseif key == "zoneOnly" or key == "profile" then
+  elseif key == "zoneOnly" or key == "instanceMode" or key == "profile" then
     ApplySoon()
   end
 end)

@@ -40,6 +40,17 @@ local function Setup()
 
   LEM:AddSystemSettings(system, {
     {
+      name = "Width",
+      desc = "Width of the tracker. The game's own is 260",
+      kind = LEM.SettingType.Slider,
+      default = defaults.width,
+      minValue = 200,
+      maxValue = 500,
+      valueStep = 10,
+      get = function () return profile().width end,
+      set = function (_, value) Set("width", value) end,
+    },
+    {
       name = "Fade out",
       desc = "The tracker fades out when you're not using it",
       kind = LEM.SettingType.Checkbox,

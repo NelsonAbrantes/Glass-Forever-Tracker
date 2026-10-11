@@ -62,6 +62,7 @@ Core.defaults = {
     backgroundColor = "black", -- black, brown, blue or grey
     backgroundSize = 36,      -- how far the background reaches past the text
     lineSpacing = 0,          -- extra space between the lines of a text
+    width = 260,              -- tracker width (the game's own is 260)
     titleColor = "gold",      -- section titles ("Quests"); see Core.COLORS
     questNameColor = "auto",  -- quest names; "auto" keeps the game's colors
     iconColor = "gold",       -- quest and minimize icons; "game" = the game's own
@@ -73,21 +74,10 @@ Core.defaults = {
     completedObjectives = "show", -- finished objectives: show or dim
     glassBars = true,         -- progress bars in the Glass style
     sectionAnimation = "glass", -- animations of sections, quests and objectives: glass, game or off
-    -- Each Glass animation, on its own (with sectionAnimation = "glass")
-    animTitles = true,        -- line and shine on new sections and quests
-    animProgress = true,      -- line under an objective that moved on
-    animComplete = true,      -- a completed objective lights up white
-    animPulse = true,         -- the "?" of a quest ready to turn in pulses
-    animTrackerSlide = true,  -- the tracker slides in when it comes back
-    animQuestSlide = true,    -- a new quest slides in
-    animQuestType = true,     -- a new quest's name writes itself
-    animQuestIcon = true,     -- a new quest's icon pops, with a ring
-    animQuestLines = true,    -- a new quest's objectives appear one by one
-    animAbandon = true,       -- an abandoned quest turns to dust
 
     -- Behavior
     zoneOnly = false,         -- track only the quests of the current zone
-    instanceMode = "normal",  -- in dungeons and raids: normal, hide or show
+    instanceMode = "normal",  -- in dungeons and raids: normal, hide, show or dungeon (only its quests)
     completeSound = true,     -- a sound when an objective or quest is done
   }
 }
@@ -121,9 +111,9 @@ function Core:Changed(key, ...)
 end
 
 ---
--- True if a Glass animation is on: the Glass look, Animations set to Glass,
--- and that animation's own option (e.g. "animPulse")
-function Core:Animates(key)
+-- True if the addon's animations are on: the Glass look with the Animation
+-- style set to Glass
+function Core:Animates()
   local profile = self.db.profile
-  return profile.glassLook and profile.sectionAnimation == "glass" and profile[key] ~= false
+  return profile.glassLook and profile.sectionAnimation == "glass"
 end

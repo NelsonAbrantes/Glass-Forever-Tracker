@@ -177,6 +177,7 @@ local function Build()
   Slider(category, "headerFontSize", "Title size", 8, 24, 1, "Size of the section titles and quest names")
   Slider(category, "lineFontSize", "Objective size", 8, 24, 1, "Size of the objectives")
   Slider(category, "lineSpacing", "Line spacing", 0, 10, 1, "Extra space between the lines of a text that takes more than one line")
+  Slider(category, "width", "Width", 200, 500, 10, "Width of the tracker. Longer quest names and objectives fit on one line. The game's own is 260")
 
   Header(layout, "Colors and icons")
   Dropdown(category, "titleColor", "Section title color", ColorChoices(),
@@ -202,17 +203,7 @@ local function Build()
     { "glass", "Glass" },
     { "game", "Game" },
     { "off", "Off" },
-  }, "Glass: the animations below, in the Glass style. Game: the game's own gold glows. Off: no animations")
-  Checkbox(category, "animTitles", "Titles light up", "A new section or quest, or a quest ready to turn in: a thin line lights up under its title and a soft shine passes over it")
-  Checkbox(category, "animProgress", "Objective progress", "An objective moves on (like 2/10 to 3/10): a thin line lights up under it")
-  Checkbox(category, "animComplete", "Completed objective", "An objective is completed: its text lights up white for a moment")
-  Checkbox(category, "animPulse", "Ready to turn in", "The \"?\" of a quest ready to turn in pulses gently until you turn it in")
-  Checkbox(category, "animTrackerSlide", "Tracker slides in", "When the tracker comes back after fading out, it slides in a little from the right (not in combat)")
-  Checkbox(category, "animQuestSlide", "New quest slides in", "A quest just accepted or tracked slides in from the right")
-  Checkbox(category, "animQuestType", "New quest name writes itself", "A new quest's name appears letter by letter")
-  Checkbox(category, "animQuestIcon", "New quest icon pops", "A new quest's icon pops and a soft ring opens around it")
-  Checkbox(category, "animQuestLines", "New quest objectives one by one", "A new quest's objectives appear one after the other")
-  Checkbox(category, "animAbandon", "Abandoned quest turns to dust", "When you abandon a quest, it turns to dust and blows away, letter by letter")
+  }, "Glass: the addon's animations (titles lighting up, objective progress, the pulsing \"?\", new quests sliding in and writing their name, abandoned quests turning to dust...). Game: the game's own gold glows. Off: no animations")
 
   Header(layout, "Background")
   Slider(category, "backgroundOpacity", "Background opacity", 0, 1, 0.05, "Opacity of the Glass background behind the tracker. 0 turns it off. The Opacity setting in Edit Mode changes it too")
@@ -230,7 +221,8 @@ local function Build()
     { "normal", "Like outside" },
     { "hide", "Hide the tracker" },
     { "show", "Always show it" },
-  }, "What the tracker does in dungeons and raids")
+    { "dungeon", "Dungeon quests only" },
+  }, "What the tracker does in dungeons and raids. Dungeon quests only: while you're inside, it tracks only the quests of that dungeon or raid, and the others again when you leave (changes wait for the end of a fight)")
   Checkbox(category, "completeSound", "Sound on complete", "A discreet sound when a quest objective is done, and another when a quest is ready to turn in")
 
   Settings.RegisterAddOnCategory(category)
@@ -270,6 +262,7 @@ Core:OnChange(function (key)
       print("  glassLook", tostring(profile.glassLook), "iconColor", tostring(profile.iconColor),
         "questNameColor", tostring(profile.questNameColor), "animation", tostring(profile.sectionAnimation))
       print("  sections", modules, "with animation hooked", hooked, "quest icons", pois, "quest names", names)
+      Core:IconsDetails()
       return
     end
     _G.Settings.OpenToCategory(Core.optionsCategory:GetID())

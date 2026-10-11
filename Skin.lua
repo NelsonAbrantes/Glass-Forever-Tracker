@@ -176,7 +176,7 @@ local function HookBlock(block)
     SetGlow(block.HeaderGlow)
     if GlassAnimations() and Profile().sectionAnimation ~= "off" and block.HeaderText then
       Core:Changed("sectionAdded") -- shows the tracker
-      if Core:Animates("animTitles") then
+      if Core:Animates() then
         PlayGlass(block, block.HeaderText, "title")
       end
       -- A quest just added: its entrance (Animations.lua, Icons.lua)
@@ -204,7 +204,7 @@ local function HookLine(line)
   if line.GlowAnim then
     local function Play()
       SetGlow(line.Glow)
-      if Core:Animates("animProgress") and line.Text then
+      if Core:Animates() and line.Text then
         PlayGlass(line, line.Text, "line")
       end
     end
@@ -217,7 +217,7 @@ local function HookLine(line)
   -- up white for a moment and goes back to its color
   if line.CheckAnim then
     line.CheckAnim:HookScript("OnPlay", function ()
-      if not Core:Animates("animComplete") or not line.Text then return end
+      if not Core:Animates() or not line.Text then return end
       local text = line.Text
       local r, g, b = text:GetTextColor()
       text:SetTextColor(1, 1, 1)
@@ -286,7 +286,7 @@ local function HookAddAnimation(header)
       if header[key] then header[key]:SetAlpha(0) end
     end
     if header.MinimizeButton then header.MinimizeButton:SetAlpha(1) end
-    if Core:Animates("animTitles") then
+    if Core:Animates() then
       PlayGlassAnimation(header)
     end
     Core:Changed("sectionAdded")

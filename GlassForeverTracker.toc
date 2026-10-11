@@ -29,6 +29,7 @@ ZoneFilter.lua
 Extras.lua
 Animations.lua
 Dust.lua
+Width.lua
 VersionCheck.lua
 Options.lua
 EditMode.lua

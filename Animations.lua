@@ -113,8 +113,9 @@ end
 
 Core:OnChange(function (key, block)
   if key ~= "questAdded" or not block then return end
-  if Core:Animates("animQuestSlide") then Slide(block) end
-  local typing = Core:Animates("animQuestType") and TypeName(block.HeaderText) or 0
+  if not Core:Animates() then return end
+  Slide(block)
+  local typing = TypeName(block.HeaderText)
   -- Objectives start when the name is about half written
-  if Core:Animates("animQuestLines") then ShowLines(block, typing * 0.5) end
+  ShowLines(block, typing * 0.5)
 end)
