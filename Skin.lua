@@ -1,6 +1,11 @@
 local _, ns = ...
 local Core = ns.Core
 
+-- luacheck: push ignore 113
+local CreateFrame = CreateFrame
+local hooksecurefunc = hooksecurefunc
+-- luacheck: pop
+
 ----
 -- Skin
 --
@@ -74,11 +79,24 @@ local function Skin()
   SkinFonts()
 end
 
--- Sections added later (e.g. a scenario starts) get the look too
+-- Sections added later (e.g. a scenario starts) get the look too. Some are
+-- set up by the game a while after login, so the art is checked again now
+-- and then (cheap: it only sets transparency).
+local CHECK_EVERY = 1
 local function HookModules()
   if tracker.AddModule and not Core:IsHooked(tracker, "AddModule") then
     Core:SecureHook(tracker, "AddModule", SkinArt)
   end
+
+  local checker = CreateFrame("Frame")
+  local elapsedTotal = 0
+  checker:SetScript("OnUpdate", function (_, elapsed)
+    elapsedTotal = elapsedTotal + elapsed
+    if elapsedTotal >= CHECK_EVERY then
+      elapsedTotal = 0
+      SkinArt()
+    end
+  end)
 end
 
 Core:OnChange(function (key)

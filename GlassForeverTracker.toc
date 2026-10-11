@@ -22,5 +22,6 @@ Core.lua
 Background.lua
 Fade.lua
 Skin.lua
+Icons.lua
 Options.lua
 EditMode.lua

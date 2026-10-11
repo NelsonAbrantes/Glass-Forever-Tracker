@@ -2,65 +2,96 @@ local _, ns = ...
 local Core = ns.Core
 
 -- luacheck: push ignore 113
-local CreateColor = CreateColor
 local CreateFrame = CreateFrame
 local UIParent = UIParent
 -- luacheck: pop
 
-local FADE_RATIO = 0.3 -- how much of the width fades in at each side
-local PAD_X = 12       -- how far it reaches past the tracker's edges
-local PAD_Y = 6
+local TEXTURE = "Interface\\AddOns\\GlassForeverTracker\\Assets\\softBackground"
+local SOFT_EDGE = 56 -- how many pixels of the image fade out at each side
+local PAD = 36       -- how far it reaches past the tracker's text
+local UPDATE_EVERY = 0.2
 
 ----
 -- Background
 --
--- The Glass background behind the tracker: dark in the middle, fading out at
--- both sides, like the background of the Glass chat. It's a frame of its own
--- behind the tracker, so the game's tracker isn't changed. Fade.lua sets its
--- visibility together with the tracker's.
+-- The Glass background behind the tracker: dark in the middle and fading out
+-- softly on every side, like a diffuse shadow. It covers only the part of the
+-- tracker that has something in it, not the whole height set in Edit Mode.
+-- It's a frame of its own behind the tracker, so the game's tracker isn't
+-- changed. Fade.lua sets its visibility together with the tracker's.
 
 local background = CreateFrame("Frame", "GlassForeverTrackerBackground", UIParent)
 background:SetFrameStrata("BACKGROUND")
 background:EnableMouse(false)
 Core.background = background
 
-local function Texture()
-  local texture = background:CreateTexture(nil, "BACKGROUND")
-  texture:SetColorTexture(1, 1, 1, 1)
-  return texture
+local texture = background:CreateTexture(nil, "BACKGROUND")
+texture:SetAllPoints()
+texture:SetTexture(TEXTURE)
+if texture.SetTextureSliceMargins then
+  texture:SetTextureSliceMargins(SOFT_EDGE, SOFT_EDGE, SOFT_EDGE, SOFT_EDGE)
+  if texture.SetTextureSliceMode and _G.Enum and _G.Enum.UITextureSliceMode then
+    texture:SetTextureSliceMode(_G.Enum.UITextureSliceMode.Stretched)
+  end
 end
 
-local left, center, right = Texture(), Texture(), Texture()
-left:SetPoint("TOPLEFT")
-left:SetPoint("BOTTOMLEFT")
-right:SetPoint("TOPRIGHT")
-right:SetPoint("BOTTOMRIGHT")
-center:SetPoint("TOPLEFT", left, "TOPRIGHT")
-center:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT")
-
-function background:Update()
+function background:UpdateColor()
   local profile = Core.db.profile
   local opacity = profile.glassLook and profile.backgroundOpacity or 0
-  local fade = math.max(20, math.floor(self:GetWidth() * FADE_RATIO))
+  texture:SetVertexColor(0, 0, 0, opacity)
+end
 
-  left:SetWidth(fade)
-  right:SetWidth(fade)
-  left:SetGradient("HORIZONTAL", CreateColor(0, 0, 0, 0), CreateColor(0, 0, 0, opacity))
-  right:SetGradient("HORIZONTAL", CreateColor(0, 0, 0, opacity), CreateColor(0, 0, 0, 0))
-  center:SetColorTexture(0, 0, 0, opacity)
+-- The lowest point with something shown: the bottom of the last section, or
+-- the tracker's own title when everything is collapsed
+local function ContentBottom(tracker)
+  local bottom
+  for _, module in ipairs(tracker.modules or {}) do
+    if module:IsShown() and module:GetHeight() > 1 then
+      local moduleBottom = module:GetBottom()
+      if moduleBottom and (not bottom or moduleBottom < bottom) then
+        bottom = moduleBottom
+      end
+    end
+  end
+  if not bottom and tracker.Header then
+    bottom = tracker.Header:GetBottom()
+  end
+  return bottom
+end
+
+function background:UpdateSize()
+  local tracker = self.tracker
+  local top, bottom = tracker:GetTop(), ContentBottom(tracker)
+  if not top or not bottom then return end
+
+  local height = math.floor(top - bottom + 0.5)
+  if height == self.contentHeight then return end
+  self.contentHeight = height
+
+  self:ClearAllPoints()
+  self:SetPoint("TOPLEFT", tracker, "TOPLEFT", -PAD, PAD)
+  self:SetPoint("BOTTOMRIGHT", tracker, "TOPRIGHT", PAD, -(height + PAD))
 end
 
 function background:Attach(tracker)
-  self:ClearAllPoints()
-  self:SetPoint("TOPLEFT", tracker, "TOPLEFT", -PAD_X, PAD_Y)
-  self:SetPoint("BOTTOMRIGHT", tracker, "BOTTOMRIGHT", PAD_X, -PAD_Y)
-  self:Update()
-end
+  self.tracker = tracker
+  self.contentHeight = nil
+  self:UpdateColor()
+  self:UpdateSize()
 
-background:SetScript("OnSizeChanged", function (self) self:Update() end)
+  -- Sections grow and shrink as quests come and go
+  local elapsedTotal = 0
+  self:SetScript("OnUpdate", function (_, elapsed)
+    elapsedTotal = elapsedTotal + elapsed
+    if elapsedTotal >= UPDATE_EVERY then
+      elapsedTotal = 0
+      self:UpdateSize()
+    end
+  end)
+end
 
 Core:OnChange(function (key)
   if key == "backgroundOpacity" or key == "glassLook" or key == "profile" then
-    background:Update()
+    background:UpdateColor()
   end
 end)
