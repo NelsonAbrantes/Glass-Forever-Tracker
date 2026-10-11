@@ -3,6 +3,7 @@ local Core = ns.Core
 
 -- luacheck: push ignore 113
 local CreateFrame = CreateFrame
+local GetTime = GetTime
 local hooksecurefunc = hooksecurefunc
 -- luacheck: pop
 
@@ -14,14 +15,18 @@ local SCAN_EVERY = 0.3
 --
 -- With the Glass look, the tracker's round quest icons ("?" ready to turn in,
 -- "..." in progress) and its minimize buttons become plain icons in the Glass
--- gold, white under the mouse or on the quest you're following. Only the look
--- changes: clicks still go to the game. Other icons (world quests, bonus
--- objectives...) keep the game's look.
+-- gold (or another color), lighter under the mouse or on the quest you're
+-- following. Only the look changes: clicks still go to the game. Other icons
+-- (world quests, bonus objectives...) keep the game's look.
 
 local tracker = _G.ObjectiveTrackerFrame
 local GOLD = Core.GOLD
 
-local function GlassLook() return Core.db.profile.glassLook end
+-- Glass icons are on with the Glass look, unless the icon color is "game"
+local function GlassLook()
+  local profile = Core.db.profile
+  return profile.glassLook and profile.iconColor ~= "game"
+end
 
 -- Keeps one of the game's textures (or frames) transparent while its button
 -- uses the Glass icon
@@ -45,12 +50,22 @@ local function CreateIcon(button, size)
   return icon
 end
 
+local LIGHTER = 0.55 -- how much white is mixed in on the followed quest
+
+-- The chosen icon color. Under the mouse and on the quest you follow it's a
+-- lighter version of it, so the color still shows (white icons get gold).
 local function SetIconColor(button, bright)
+  local choice = Core.db.profile.iconColor
+  local r, g, b = Core:Color(choice)
+  r, g, b = r or GOLD.r, g or GOLD.g, b or GOLD.b
   if bright or button.gftHover then
-    button.gftIcon:SetVertexColor(1, 1, 1)
-  else
-    button.gftIcon:SetVertexColor(GOLD.r, GOLD.g, GOLD.b)
+    if choice == "white" then
+      r, g, b = GOLD.r, GOLD.g, GOLD.b
+    else
+      r, g, b = r + (1 - r) * LIGHTER, g + (1 - g) * LIGHTER, b + (1 - b) * LIGHTER
+    end
   end
+  button.gftIcon:SetVertexColor(r, g, b)
 end
 
 ----
@@ -63,6 +78,89 @@ local function PoiIcon(style)
   if style == styles.QuestComplete then return "questComplete" end
   if style == styles.QuestInProgress then return "questProgress" end
   return nil
+end
+
+-- Icon animations, done frame by frame by the addon itself (the game's scale
+-- animations kept growing here): the size is worked out each frame and can't
+-- go past MAX_SCALE.
+-- - Pulse: a quest ready to turn in, its "?" a little bigger and fainter,
+--   then back, over and over
+-- - Pop: a quest just added, its icon grows past its size and settles, while
+--   a soft ring opens around it
+local ICON_SIZE = 16
+local MAX_SCALE = 1.5
+local PULSE_TIME = 0.7   -- seconds to grow (and as many to come back)
+local PULSE_GROW = 0.18  -- 18% bigger at the top
+local POP_GROW, POP_SETTLE = 0.18, 0.15
+local RING_TIME, RING_SIZE = 0.6, 30
+
+local animated = {} -- button -> { pulse = start time, pop = start time, ring = start time }
+local animator = CreateFrame("Frame")
+animator:Hide()
+
+local function EaseOut(k) return 1 - (1 - k) * (1 - k) end
+
+animator:SetScript("OnUpdate", function ()
+  local now = GetTime()
+  for button, state in pairs(animated) do
+    local scale, alpha = 1, 1
+
+    if state.pulse then
+      local t = (now - state.pulse) % (PULSE_TIME * 2)
+      local wave = 0.5 - 0.5 * math.cos(math.pi * t / PULSE_TIME)
+      scale = scale * (1 + PULSE_GROW * wave)
+      alpha = 1 - 0.4 * wave
+    end
+
+    if state.pop then
+      local e = now - state.pop
+      if e < POP_GROW then
+        scale = scale * (0.3 + 0.95 * EaseOut(e / POP_GROW))
+      elseif e < POP_GROW + POP_SETTLE then
+        scale = scale * (1.25 - 0.25 * (e - POP_GROW) / POP_SETTLE)
+      else
+        state.pop = nil
+      end
+    end
+
+    if state.ring and button.gftRing then
+      local k = (now - state.ring) / RING_TIME
+      if k < 1 then
+        local size = RING_SIZE * (0.4 + 1.2 * EaseOut(k))
+        button.gftRing:SetSize(size, size)
+        button.gftRing:SetAlpha(0.9 * (1 - k))
+      else
+        button.gftRing:SetAlpha(0)
+        state.ring = nil
+      end
+    end
+
+    local size = ICON_SIZE * math.min(scale, MAX_SCALE)
+    button.gftIcon:SetSize(size, size)
+    button.gftIcon:SetAlpha(alpha)
+
+    if not (state.pulse or state.pop or state.ring) then
+      animated[button] = nil
+    end
+  end
+  if next(animated) == nil then animator:Hide() end
+end)
+
+local function Animate(button, key, on)
+  local state = animated[button]
+  if on then
+    if not state then
+      state = {}
+      animated[button] = state
+    end
+    if key ~= "pulse" or not state.pulse then state[key] = GetTime() end
+    animator:Show()
+  elseif state and state[key] then
+    state[key] = nil
+    if key == "pulse" then button.gftIcon:SetAlpha(1) end
+    -- Back to its normal size (the animator lets go of it once nothing's left)
+    animator:Show()
+  end
 end
 
 local function UpdatePoi(button)
@@ -85,6 +183,9 @@ local function UpdatePoi(button)
   else
     button.gftIcon:Hide()
   end
+
+  -- A quest ready to turn in: the "?" pulses gently until it's turned in
+  Animate(button, "pulse", styled and icon == "questComplete" and Core:Animates("animPulse"))
 end
 
 local function StylePoi(button)
@@ -103,6 +204,24 @@ local function StylePoi(button)
   hooksecurefunc(button, "UpdateButtonStyle", UpdatePoi)
   hooksecurefunc(button, "SetSelected", UpdatePoi)
   UpdatePoi(button)
+end
+
+-- A quest just added (Animations: Glass): its icon pops (grows past its size
+-- and settles) and a soft ring opens around it, in the icon color
+local function PopIcon(button)
+  if not button or not button.gftIcon or not button.gftStyled then return end
+  if not button.gftRing then
+    local ring = button:CreateTexture(nil, "OVERLAY", nil, 6)
+    ring:SetTexture(ASSETS.."ring")
+    ring:SetBlendMode("ADD")
+    ring:SetPoint("CENTER")
+    ring:SetAlpha(0)
+    button.gftRing = ring
+  end
+  local r, g, b = button.gftIcon:GetVertexColor()
+  button.gftRing:SetVertexColor(r, g, b)
+  Animate(button, "pop", true)
+  Animate(button, "ring", true)
 end
 
 ----
@@ -147,8 +266,57 @@ local function StyleMinimize(header)
 end
 
 ----
+-- Quest names in the chosen color. The game (and other addons) color them
+-- again on every update, so the color is put back right after.
+
+local QUEST_NAMES = {}
+
+local function ApplyQuestNameColor(text)
+  local r, g, b = Core:Color(Core.db.profile.questNameColor)
+  if not r then return end -- "auto": the game's colors
+  text.gftColoring = true
+  text:SetTextColor(r, g, b)
+  text.gftColoring = false
+end
+
+-- Other addons can put a color inside the text itself (e.g. the quest level
+-- in its difficulty color), which wins over any text color: with a chosen
+-- color, those inline colors are taken out
+local function StripInlineColors(text)
+  if not Core:Color(Core.db.profile.questNameColor) then return end
+  local value = text:GetText()
+  if type(value) ~= "string" or (issecretvalue and issecretvalue(value)) then return end
+  if not value:find("|c") then return end
+  local plain = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn.-:", ""):gsub("|r", "")
+  text.gftColoring = true
+  text:SetText(plain)
+  text.gftColoring = false
+end
+
+local function ColorQuestName(text)
+  if not text or QUEST_NAMES[text] then return end
+  QUEST_NAMES[text] = true
+  hooksecurefunc(text, "SetTextColor", function ()
+    if not text.gftColoring then ApplyQuestNameColor(text) end
+  end)
+  hooksecurefunc(text, "SetText", function ()
+    if not text.gftColoring then StripInlineColors(text) end
+  end)
+  StripInlineColors(text)
+  ApplyQuestNameColor(text)
+end
+
+-- For /gft debug
+function Core:IconsDebug()
+  local pois, names = 0, 0
+  for _ in pairs(POI_ICONS) do pois = pois + 1 end
+  for _ in pairs(QUEST_NAMES) do names = names + 1 end
+  return pois, names
+end
+
+----
 -- Finding them: quest blocks come and go, so the tracker is checked often
--- (cheap: only icons not seen before are set up)
+-- (cheap: only things not seen before are set up)
 
 local function Scan()
   StyleMinimize(tracker.Header)
@@ -159,6 +327,7 @@ local function Scan()
         if block.poiButton and not POI_ICONS[block.poiButton] then
           StylePoi(block.poiButton)
         end
+        ColorQuestName(block.HeaderText)
       end
     end
   end
@@ -169,7 +338,7 @@ local function UpdateAll()
   for button in pairs(MINIMIZE_BUTTONS) do UpdateMinimize(button) end
 end
 
-Core:OnChange(function (key)
+Core:OnChange(function (key, ...)
   if key == "enable" then
     local scanner = CreateFrame("Frame")
     local elapsedTotal = 0
@@ -181,7 +350,22 @@ Core:OnChange(function (key)
       end
     end)
     Scan()
-  elseif key == "glassLook" or key == "profile" then
+  elseif key == "sectionAdded" then
+    Scan() -- the icons of a new section, without waiting for the next check
+  elseif key == "questAdded" then
+    local block = ...
+    if block and block.poiButton and Core:Animates("animQuestIcon") then
+      StylePoi(block.poiButton)
+      PopIcon(block.poiButton)
+    end
+  elseif key == "glassLook" or key == "iconColor" or key == "sectionAnimation" or key == "animPulse" or key == "profile" then
     UpdateAll()
+  end
+  if key == "questNameColor" or key == "profile" then
+    -- Back to "auto": the game colors them again on its next update
+    for text in pairs(QUEST_NAMES) do
+      StripInlineColors(text)
+      ApplyQuestNameColor(text)
+    end
   end
 end)

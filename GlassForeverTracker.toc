@@ -6,6 +6,7 @@
 ## Version: 0.1.0-forever
 ## SavedVariables: GlassForeverTrackerDB
 ## Dependencies: Blizzard_ObjectiveTracker
+## OptionalDeps: SharedMedia, SharedMediaAdditionalFonts
 
 # Libs
 libs\LibStub\LibStub.lua
@@ -23,5 +24,9 @@ Background.lua
 Fade.lua
 Skin.lua
 Icons.lua
+Sounds.lua
+ZoneFilter.lua
+Extras.lua
+Animations.lua
 Options.lua
 EditMode.lua

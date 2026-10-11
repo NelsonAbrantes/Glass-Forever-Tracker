@@ -5,6 +5,8 @@ local Core = ns.Core
 local C_Timer = C_Timer
 local CreateFrame = CreateFrame
 local GetTime = GetTime
+local InCombatLockdown = InCombatLockdown
+local IsInInstance = IsInInstance
 local UIParent = UIParent
 -- luacheck: pop
 
@@ -46,6 +48,36 @@ local function Apply(alpha)
   Core.background:SetAlpha(alpha)
 end
 
+-- The slide that goes with the fade in (Animations: Glass): the tracker and
+-- its background come in from a little to the right. Only out of combat, to
+-- leave the tracker alone during fights.
+local SLIDE_DISTANCE = 24
+local SLIDE_TIME = 0.35
+
+local function SlideGroup(frame)
+  local group = frame:CreateAnimationGroup()
+  local away = group:CreateAnimation("Translation")
+  away:SetOffset(SLIDE_DISTANCE, 0)
+  away:SetDuration(0)
+  away:SetOrder(1)
+  local back = group:CreateAnimation("Translation")
+  back:SetOffset(-SLIDE_DISTANCE, 0)
+  back:SetDuration(SLIDE_TIME)
+  back:SetOrder(2)
+  back:SetSmoothing("OUT")
+  return group
+end
+
+local slides
+local function SlideIn()
+  if not Core:Animates("animTrackerSlide") or InCombatLockdown() or InEditMode() then return end
+  slides = slides or { SlideGroup(tracker), SlideGroup(Core.background) }
+  for _, group in ipairs(slides) do
+    group:Stop()
+    group:Play()
+  end
+end
+
 local ticker = CreateFrame("Frame", nil, UIParent)
 ticker:SetScript("OnUpdate", function (_, elapsed)
   local profile = Profile()
@@ -57,11 +89,23 @@ ticker:SetScript("OnUpdate", function (_, elapsed)
     if not mouseOver then Reveal() end
   end
 
+  -- In dungeons and raids (Options): hidden, or always shown
+  local instanceMode = state.inInstance and profile.instanceMode or "normal"
+
   local shown = not profile.fade
+    or instanceMode == "show"
     or InEditMode()
     or (profile.showOnMouseOver and mouseOver)
     or GetTime() < state.visibleUntil
-  state.target = shown and 1 or profile.fadedAlpha
+  if instanceMode == "hide" and not InEditMode() then
+    shown = false
+  end
+  local target = shown and 1 or (instanceMode == "hide" and 0 or profile.fadedAlpha)
+  -- Coming back from (nearly) hidden: it also slides in a little
+  if target == 1 and state.target ~= 1 and state.alpha < 0.3 then
+    SlideIn()
+  end
+  state.target = target
 
   -- Move towards the target over the fade in / fade out duration
   if state.alpha ~= state.target then
@@ -88,18 +132,20 @@ end
 local PROGRESS_EVENTS = {
   "QUEST_WATCH_UPDATE",       -- an objective of a tracked quest moved
   "QUEST_ACCEPTED",
+  "QUEST_WATCH_LIST_CHANGED", -- a quest tracked or untracked
   "QUEST_TURNED_IN",
   "QUEST_REMOVED",
   "QUEST_LOG_CRITERIA_UPDATE",
   "TRACKED_ACHIEVEMENT_UPDATE",
-  "SCENARIO_CRITERIA_UPDATE",
-  "SCENARIO_UPDATE",
 }
 
 local events = CreateFrame("Frame")
 events:SetScript("OnEvent", function (_, event)
-  if event == "PLAYER_ENTERING_WORLD" then
-    Reveal()
+  if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+    -- Dungeons and raids
+    local inInstance, instanceType = IsInInstance()
+    state.inInstance = inInstance and (instanceType == "party" or instanceType == "raid") or false
+    if event == "PLAYER_ENTERING_WORLD" then Reveal() end
   elseif Profile().showOnProgress then
     Reveal()
   end
@@ -111,6 +157,7 @@ function Core:OnEnable()
   self:SecureHook(tracker, "SetAlpha", KeepAlpha)
 
   events:RegisterEvent("PLAYER_ENTERING_WORLD")
+  events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
   for _, event in ipairs(PROGRESS_EVENTS) do
     pcall(events.RegisterEvent, events, event)
   end
@@ -121,7 +168,7 @@ function Core:OnEnable()
 end
 
 Core:OnChange(function (key)
-  if key == "fade" or key == "profile" then
+  if key == "fade" or key == "profile" or key == "sectionAdded" then
     Reveal()
   end
 end)

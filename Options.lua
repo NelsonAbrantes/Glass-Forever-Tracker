@@ -141,6 +141,18 @@ local function FontDropdown(layout)
   layout:AddInitializer(initializer)
 end
 
+-- The color choices, with extra entries first (e.g. "Game colors")
+local function ColorChoices(extra)
+  local choices = {}
+  for _, entry in ipairs(extra or {}) do
+    table.insert(choices, entry)
+  end
+  for _, entry in ipairs(Core.COLORS) do
+    table.insert(choices, { entry[1], entry[2] })
+  end
+  return choices
+end
+
 local function Build()
   local Settings = _G.Settings
   local category, layout = Settings.RegisterVerticalLayoutCategory(TITLE)
@@ -154,8 +166,8 @@ local function Build()
   Checkbox(category, "showOnMouseOver", "Show on mouse over", "Show the tracker while the mouse is over it")
   Checkbox(category, "showOnProgress", "Show on progress", "Show the tracker for a while when a quest or achievement objective changes, or you accept or turn in a quest")
 
-  Header(layout, "Look")
-  Checkbox(category, "glassLook", "Glass look", "No header bars or panel background from the game, the Glass background and font, and section titles in gold. Off: the game's own look")
+  Header(layout, "Text")
+  Checkbox(category, "glassLook", "Glass look", "No header bars or panel background from the game, the Glass background, font, colors and icons. Off: the game's own look")
   FontDropdown(layout)
   Dropdown(category, "fontFlags", "Font outline", {
     { "", "None" },
@@ -164,7 +176,60 @@ local function Build()
   }, "Outline around the letters")
   Slider(category, "headerFontSize", "Title size", 8, 24, 1, "Size of the section titles and quest names")
   Slider(category, "lineFontSize", "Objective size", 8, 24, 1, "Size of the objectives")
-  Slider(category, "backgroundOpacity", "Background opacity", 0, 1, 0.05, "Opacity of the Glass background behind the tracker. 0 turns it off")
+  Slider(category, "lineSpacing", "Line spacing", 0, 10, 1, "Extra space between the lines of a text that takes more than one line")
+
+  Header(layout, "Colors and icons")
+  Dropdown(category, "titleColor", "Section title color", ColorChoices(),
+    "Color of the section titles (\"All Objectives\", \"Quests\", \"Campaign\"...)")
+  Dropdown(category, "questNameColor", "Quest name color", ColorChoices({ { "auto", "Game colors" } }),
+    "Color of the quest names. Game colors: as the game (or another addon) colors them, e.g. by difficulty")
+  Dropdown(category, "iconColor", "Icons", ColorChoices({ { "game", "Game icons" } }),
+    "Color of the quest icons (\"?\" and \"...\") and the minimize buttons. Game icons: the game's own round icons")
+  Checkbox(category, "glassBars", "Glass progress bars", "Progress bars (shown by some objectives) as a flat bar in the section title color, without the game's frame")
+  Dropdown(category, "completedObjectives", "Completed objectives", {
+    { "show", "Show" },
+    { "dim", "Dim" },
+  }, "Dim: finished objectives (with the green check) are shown faded, so what's left stands out")
+
+  Header(layout, "Titles")
+  Checkbox(category, "hideMainHeader", "Hide \"All Objectives\"", "Hide the tracker's main title and its minimize button. Its space stays")
+  Checkbox(category, "hideSectionHeaders", "Hide section titles", "Hide the section titles (\"Quests\", \"Campaign\"...) and their minimize buttons. Their space stays")
+  Checkbox(category, "questCount", "Quest count", "Show in the Quests title how many quests you have and how many fit in the quest log, like \"Quests  12/25\"")
+
+  Header(layout, "Animations")
+  Dropdown(category, "sectionAnimation", "Animation style", {
+    { "glass", "Glass" },
+    { "game", "Game" },
+    { "off", "Off" },
+  }, "Glass: the animations below, in the Glass style. Game: the game's own gold glows. Off: no animations")
+  Checkbox(category, "animTitles", "Titles light up", "A new section or quest, or a quest ready to turn in: a thin line lights up under its title and a soft shine passes over it")
+  Checkbox(category, "animProgress", "Objective progress", "An objective moves on (like 2/10 to 3/10): a thin line lights up under it")
+  Checkbox(category, "animComplete", "Completed objective", "An objective is completed: its text lights up white for a moment")
+  Checkbox(category, "animPulse", "Ready to turn in", "The \"?\" of a quest ready to turn in pulses gently until you turn it in")
+  Checkbox(category, "animTrackerSlide", "Tracker slides in", "When the tracker comes back after fading out, it slides in a little from the right (not in combat)")
+  Checkbox(category, "animQuestSlide", "New quest slides in", "A quest just accepted or tracked slides in from the right")
+  Checkbox(category, "animQuestType", "New quest name writes itself", "A new quest's name appears letter by letter")
+  Checkbox(category, "animQuestIcon", "New quest icon pops", "A new quest's icon pops and a soft ring opens around it")
+  Checkbox(category, "animQuestLines", "New quest objectives one by one", "A new quest's objectives appear one after the other")
+
+  Header(layout, "Background")
+  Slider(category, "backgroundOpacity", "Background opacity", 0, 1, 0.05, "Opacity of the Glass background behind the tracker. 0 turns it off. The Opacity setting in Edit Mode changes it too")
+  Dropdown(category, "backgroundColor", "Background color", {
+    { "black", "Black" },
+    { "brown", "Dark brown" },
+    { "blue", "Dark blue" },
+    { "grey", "Dark grey" },
+  }, "Color of the Glass background")
+  Slider(category, "backgroundSize", "Background size", 0, 80, 2, "How far the background reaches past the text, where it fades out")
+
+  Header(layout, "Behavior")
+  Checkbox(category, "zoneOnly", "Only quests in this zone", "Track only the quests of the zone you're in, and switch when you change zone. The others stay in your quest log. Changes wait for the end of a fight. Turning it off tracks them again")
+  Dropdown(category, "instanceMode", "In dungeons and raids", {
+    { "normal", "Like outside" },
+    { "hide", "Hide the tracker" },
+    { "show", "Always show it" },
+  }, "What the tracker does in dungeons and raids")
+  Checkbox(category, "completeSound", "Sound on complete", "A discreet sound when a quest objective is done, and another when a quest is ready to turn in")
 
   Settings.RegisterAddOnCategory(category)
   return category
@@ -176,7 +241,35 @@ Core:OnChange(function (key)
   Core.optionsCategory = Build()
 
   _G.SLASH_GLASSFOREVERTRACKER1 = "/gft"
-  _G.SlashCmdList.GLASSFOREVERTRACKER = function ()
+  _G.SlashCmdList.GLASSFOREVERTRACKER = function (input)
+    -- /gft testanim: plays the new section animation now
+    if input and input:lower():match("^%s*testanim") then
+      local result = Core:TestAnimation()
+      if result == "off" then
+        print("|cffdfba69Glass Forever Tracker|r: animations are off (Options > Animations)")
+      elseif not result then
+        print("|cffdfba69Glass Forever Tracker|r: no section shown to animate")
+      end
+      return
+    end
+    -- /gft debug: what the addon sees, to find problems
+    if input and input:lower():match("^%s*debug") then
+      local profile = Profile()
+      local tracker = _G.ObjectiveTrackerFrame
+      local modules, hooked = 0, 0
+      for _, module in ipairs(tracker.modules or {}) do
+        modules = modules + 1
+        if module.Header and module.Header.AddAnim and module.Header.AddAnim.gftHooked then
+          hooked = hooked + 1
+        end
+      end
+      local pois, names = Core:IconsDebug()
+      print("|cffdfba69Glass Forever Tracker|r", Core.Version)
+      print("  glassLook", tostring(profile.glassLook), "iconColor", tostring(profile.iconColor),
+        "questNameColor", tostring(profile.questNameColor), "animation", tostring(profile.sectionAnimation))
+      print("  sections", modules, "with animation hooked", hooked, "quest icons", pois, "quest names", names)
+      return
+    end
     _G.Settings.OpenToCategory(Core.optionsCategory:GetID())
   end
 end)

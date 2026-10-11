@@ -6,7 +6,8 @@ local Core = ns.Core
 --
 -- Adds the main Glass Forever Tracker settings to the game's own Objective
 -- Tracker entry in Edit Mode, next to its Height and Opacity. They're the
--- same settings as in the Options window.
+-- same settings as in the Options window. The game's own Opacity and Text
+-- Size there control the Glass background and the text sizes.
 
 local function RoundTo2(value)
   return math.floor(value * 100 + 0.5) / 100
@@ -53,39 +54,35 @@ local function Setup()
       get = function () return profile().glassLook end,
       set = function (_, value) Set("glassLook", value) end,
     },
-    {
-      name = "Title size",
-      kind = LEM.SettingType.Slider,
-      default = defaults.headerFontSize,
-      minValue = 8,
-      maxValue = 24,
-      valueStep = 1,
-      get = function () return profile().headerFontSize end,
-      set = function (_, value) Set("headerFontSize", value) end,
-    },
-    {
-      name = "Objective size",
-      kind = LEM.SettingType.Slider,
-      default = defaults.lineFontSize,
-      minValue = 8,
-      maxValue = 24,
-      valueStep = 1,
-      get = function () return profile().lineFontSize end,
-      set = function (_, value) Set("lineFontSize", value) end,
-    },
-    {
-      name = "Glass background",
-      desc = "Opacity of the Glass background behind the tracker",
-      kind = LEM.SettingType.Slider,
-      default = defaults.backgroundOpacity,
-      minValue = 0,
-      maxValue = 1,
-      valueStep = 0.05,
-      formatter = RoundTo2,
-      get = function () return profile().backgroundOpacity end,
-      set = function (_, value) Set("backgroundOpacity", RoundTo2(value)) end,
-    },
   })
+
+  -- The game's own Opacity and Text Size settings drive the Glass background
+  -- and the text sizes, so they keep doing something with the Glass look.
+  -- Only changes made in Edit Mode count: the game also applies them when it
+  -- loads, which would undo the sizes chosen in the Options window.
+  local manager = _G.ObjectiveTrackerManager
+  if manager then
+    local function InEditMode()
+      local frame = _G.EditModeManagerFrame
+      return frame and frame:IsShown()
+    end
+
+    hooksecurefunc(manager, "SetOpacity", function (_, opacity)
+      if InEditMode() then
+        Set("backgroundOpacity", RoundTo2((opacity or 0) / 100))
+      end
+    end)
+
+    hooksecurefunc(manager, "SetTextSize", function (_, size)
+      if not size then return end
+      if InEditMode() then
+        profile().lineFontSize = size
+        profile().headerFontSize = size + 2 -- like the game: titles 2 bigger
+      end
+      -- The game has just put its own fonts back: Glass' again
+      Core:Changed("lineFontSize")
+    end)
+  end
 end
 
 Core:OnChange(function (key)

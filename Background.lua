@@ -8,7 +8,13 @@ local UIParent = UIParent
 
 local TEXTURE = "Interface\\AddOns\\GlassForeverTracker\\Assets\\softBackground"
 local SOFT_EDGE = 56 -- how many pixels of the image fade out at each side
-local PAD = 36       -- how far it reaches past the tracker's text
+-- Background colors offered in the options (dark, so the text stays readable)
+local BACKGROUND_COLORS = {
+  black = { 0, 0, 0 },
+  brown = { 0.14, 0.09, 0.05 },
+  blue = { 0.03, 0.06, 0.13 },
+  grey = { 0.13, 0.13, 0.14 },
+}
 local UPDATE_EVERY = 0.2
 
 ----
@@ -38,7 +44,8 @@ end
 function background:UpdateColor()
   local profile = Core.db.profile
   local opacity = profile.glassLook and profile.backgroundOpacity or 0
-  texture:SetVertexColor(0, 0, 0, opacity)
+  local color = BACKGROUND_COLORS[profile.backgroundColor] or BACKGROUND_COLORS.black
+  texture:SetVertexColor(color[1], color[2], color[3], opacity)
 end
 
 -- The lowest point with something shown: the bottom of the last section, or
@@ -69,8 +76,10 @@ function background:UpdateSize()
   self.contentHeight = height
 
   self:ClearAllPoints()
-  self:SetPoint("TOPLEFT", tracker, "TOPLEFT", -PAD, PAD)
-  self:SetPoint("BOTTOMRIGHT", tracker, "TOPRIGHT", PAD, -(height + PAD))
+  -- How far it reaches past the text (Options: background size)
+  local pad = Core.db.profile.backgroundSize
+  self:SetPoint("TOPLEFT", tracker, "TOPLEFT", -pad, pad)
+  self:SetPoint("BOTTOMRIGHT", tracker, "TOPRIGHT", pad, -(height + pad))
 end
 
 function background:Attach(tracker)
@@ -91,7 +100,14 @@ function background:Attach(tracker)
 end
 
 Core:OnChange(function (key)
-  if key == "backgroundOpacity" or key == "glassLook" or key == "profile" then
+  if key == "backgroundOpacity" or key == "backgroundColor" or key == "glassLook" or key == "profile" then
     background:UpdateColor()
+  end
+end)
+
+Core:OnChange(function (key)
+  if key == "backgroundSize" or key == "profile" then
+    background.contentHeight = nil -- place it again
+    if background.tracker then background:UpdateSize() end
   end
 end)

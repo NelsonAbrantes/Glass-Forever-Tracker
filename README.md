@@ -11,4 +11,4 @@ The objective tracker with the look of [Glass Forever](https://github.com/Nelson
 - **Options** in the game's Options window (Options > AddOns > Glass Forever Tracker, or `/gft`).
 - **Edit Mode.** The main settings are also in the game's own Objective Tracker entry in Edit Mode.
 
-The tracker itself is still the game's: quests, achievements, scenarios, quest items and everything else work as usual.
+The tracker itself is still the game's: quests, achievements, quest items and everything else work as usual.
