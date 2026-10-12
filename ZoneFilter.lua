@@ -100,6 +100,12 @@ local function ApplySoon()
   end)
 end
 
+-- After logging in or /reload the game only fills the quest log and puts
+-- back the tracked quests a few seconds later, undoing an early filter. It's
+-- applied again then (it only changes what doesn't match).
+local AFTER_LOADING = { 2, 5, 10 }
+local waitingForLog = false
+
 local events = CreateFrame("Frame")
 events:SetScript("OnEvent", function (_, event)
   if event == "PLAYER_REGEN_ENABLED" then
@@ -107,8 +113,22 @@ events:SetScript("OnEvent", function (_, event)
       pendingCombat = false
       ApplySoon()
     end
+  elseif event == "QUEST_LOG_UPDATE" then
+    -- The first full quest log after loading
+    if waitingForLog and C_QuestLog.GetNumQuestLogEntries() > 0 then
+      waitingForLog = false
+      events:UnregisterEvent("QUEST_LOG_UPDATE")
+      ApplySoon()
+    end
   else
     ApplySoon()
+    if event == "PLAYER_ENTERING_WORLD" then
+      for _, delay in ipairs(AFTER_LOADING) do
+        C_Timer.After(delay, Apply)
+      end
+      waitingForLog = true
+      events:RegisterEvent("QUEST_LOG_UPDATE")
+    end
   end
 end)
 
@@ -119,6 +139,9 @@ Core:OnChange(function (key)
     events:RegisterEvent("QUEST_ACCEPTED")
     events:RegisterEvent("PLAYER_REGEN_ENABLED")
     ApplySoon()
+    for _, delay in ipairs(AFTER_LOADING) do
+      C_Timer.After(delay, Apply)
+    end
   elseif key == "zoneOnly" or key == "instanceMode" or key == "profile" then
     ApplySoon()
   end

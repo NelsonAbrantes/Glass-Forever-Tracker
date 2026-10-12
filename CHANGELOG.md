@@ -22,4 +22,6 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - The game's growing animations go wrong in this game version: the check of a completed objective flew at the screen, huge. Those animations are stopped and done by the addon instead, capped (`Skin.lua`, `Icons.lua`).
 - Smoother animations: icons, lines and specks no longer move pixel by pixel, a new quest's entrance no longer restarts halfway or slides twice, and its objectives show in order (`Core.lua`, `Animations.lua`, `Fade.lua`).
 - Animated names count letters, not bytes, so accented or non-Latin names take the right time (`Animations.lua`, `Dust.lua`).
+- The tracker showed up with the mouse over the empty part of its box (down to its Edit Mode height) or over a window on top of it, like the bags. Now only the quests themselves count (`Fade.lua`).
+- After a /reload inside a dungeon, "Dungeon quests only" showed every quest: the game puts them back a few seconds after loading, so the filter is applied again then (`ZoneFilter.lua`).
 - Quest icons no longer go back to the game's art, and the gold ring no longer stays after accepting a quest (`Icons.lua`).

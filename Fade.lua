@@ -4,8 +4,11 @@ local Core = ns.Core
 -- luacheck: push ignore 113
 local C_Timer = C_Timer
 local CreateFrame = CreateFrame
+local GetMouseFocus = GetMouseFocus
+local GetMouseFoci = GetMouseFoci
 local GetTime = GetTime
 local InCombatLockdown = InCombatLockdown
+local WorldFrame = WorldFrame
 local IsInInstance = IsInInstance
 local UIParent = UIParent
 -- luacheck: pop
@@ -84,11 +87,43 @@ function Core:TrackerSliding()
   return slides ~= nil and slides[1]:IsPlaying()
 end
 
+-- Part of the tracker (its quests, buttons...) or its background
+local function IsTrackerPart(frame)
+  for _ = 1, 20 do
+    if not frame then return false end
+    if frame == tracker or frame == Core.background then return true end
+    frame = frame.GetParent and frame:GetParent()
+  end
+  return false
+end
+
+-- Another window (bags, character...) under the mouse, on top of the tracker
+local function OtherWindowOnTop()
+  local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
+  for _, focus in ipairs(foci) do
+    if focus and focus ~= WorldFrame and not IsTrackerPart(focus) then return true end
+  end
+  return false
+end
+
+-- The mouse over the quests: only the part with something shown (the
+-- tracker's box goes on, empty, down to its Edit Mode height), with nothing
+-- else on top
+local function MouseOverQuests()
+  if not tracker:IsVisible() then return false end
+  local empty = 0
+  local contentHeight = Core.background.contentHeight
+  if contentHeight then
+    empty = math.max(0, tracker:GetHeight() - contentHeight)
+  end
+  return tracker:IsMouseOver(8, empty - 8, -8, 8) and not OtherWindowOnTop()
+end
+
 local ticker = CreateFrame("Frame", nil, UIParent)
 ticker:SetScript("OnUpdate", function (_, elapsed)
   local profile = Profile()
 
-  local mouseOver = tracker:IsVisible() and tracker:IsMouseOver(8, -8, -8, 8)
+  local mouseOver = MouseOverQuests()
   if mouseOver ~= state.mouseOver then
     state.mouseOver = mouseOver
     -- Leaving it starts the countdown again
