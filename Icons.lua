@@ -38,14 +38,16 @@ local function KeepHidden(region, button)
   end)
 end
 
+local Smooth = Core.Smooth -- grows smoothly, not pixel by pixel
+
 local function CreateIcon(button, size)
-  local icon = button:CreateTexture(nil, "OVERLAY", nil, 7)
+  local icon = Smooth(button:CreateTexture(nil, "OVERLAY", nil, 7))
   icon:SetSize(size, size)
   icon:SetPoint("CENTER")
   button.gftIcon = icon
 
   -- The outline: the icon's shape a little bigger, in black, behind it
-  local outline = button:CreateTexture(nil, "OVERLAY", nil, 6)
+  local outline = Smooth(button:CreateTexture(nil, "OVERLAY", nil, 6))
   outline:SetSize(size, size)
   outline:SetPoint("CENTER")
   outline:SetVertexColor(0, 0, 0, 0.9)
@@ -112,7 +114,8 @@ local ICON_SIZE = 16
 local MAX_SCALE = 1.5
 local PULSE_TIME = 0.7   -- seconds to grow (and as many to come back)
 local PULSE_GROW = 0.18  -- 18% bigger at the top
-local POP_GROW, POP_SETTLE = 0.18, 0.15
+local POP_GROW, POP_SETTLE = 0.25, 0.25
+local POP_FROM, POP_TOP = 0.6, 1.15 -- starts at 60% of its size, peaks at 115%
 local RING_TIME, RING_SIZE = 0.6, 30
 
 local animated = {} -- button -> { pulse = start time, pop = start time, ring = start time }
@@ -136,9 +139,10 @@ animator:SetScript("OnUpdate", function ()
     if state.pop then
       local e = now - state.pop
       if e < POP_GROW then
-        scale = scale * (0.3 + 0.95 * EaseOut(e / POP_GROW))
+        scale = scale * (POP_FROM + (POP_TOP - POP_FROM) * EaseOut(e / POP_GROW))
       elseif e < POP_GROW + POP_SETTLE then
-        scale = scale * (1.25 - 0.25 * (e - POP_GROW) / POP_SETTLE)
+        local k = (e - POP_GROW) / POP_SETTLE
+        scale = scale * (POP_TOP - (POP_TOP - 1) * k * k * (3 - 2 * k))
       else
         state.pop = nil
       end
@@ -232,6 +236,12 @@ local function StylePoi(button)
     if button[method] then hooksecurefunc(button, method, UpdatePoi) end
   end
   button:HookScript("OnShow", UpdatePoi)
+  -- The game's own entrance makes the whole icon grow, and growing
+  -- animations go wrong in this game version: it's stopped (the Glass icon
+  -- has its own pop)
+  if button.AddAnim then
+    button.AddAnim:HookScript("OnPlay", function (group) group:Stop() end)
+  end
   UpdatePoi(button)
 end
 
@@ -262,7 +272,7 @@ end
 local function PopIcon(button)
   if not button or not button.gftIcon or not button.gftStyled then return end
   if not button.gftRing then
-    local ring = button:CreateTexture(nil, "OVERLAY", nil, 5)
+    local ring = Smooth(button:CreateTexture(nil, "OVERLAY", nil, 5))
     ring:SetTexture(ASSETS.."ring")
     ring:SetBlendMode("ADD")
     ring:SetPoint("CENTER")

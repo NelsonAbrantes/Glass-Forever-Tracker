@@ -3,7 +3,9 @@ local Core = ns.Core
 
 -- luacheck: push ignore 113
 local CreateFrame = CreateFrame
+local C_Timer = C_Timer
 local GetTime = GetTime
+local InCombatLockdown = InCombatLockdown
 local geterrorhandler = geterrorhandler
 -- luacheck: pop
 
@@ -84,37 +86,74 @@ local function TypeName(text)
   return duration
 end
 
+-- Smooth start and end
+local function Ease(k) return k * k * (3 - 2 * k) end
+
+-- The game can start its own fade of the objectives again while ours runs:
+-- ours wins, otherwise they flash
+local function KeepOurFade(line)
+  if line.gftFadeHooked or not line.FadeInAnim then return end
+  line.gftFadeHooked = true
+  line.FadeInAnim:HookScript("OnPlay", function (group)
+    if line.gftAnimating then group:Stop() end
+  end)
+end
+
 -- The objectives appear one by one, top to bottom, starting after `delay`
 local function ShowLines(block, delay)
   local lines = {}
   for _, line in pairs(block.usedLines or {}) do
     table.insert(lines, line)
   end
-  table.sort(lines, function (a, b) return (a:GetTop() or 0) > (b:GetTop() or 0) end)
 
-  for i, line in ipairs(lines) do
-    -- The game fades them all in at once: ours instead
-    if line.FadeInAnim then line.FadeInAnim:Stop() end
+  -- Hidden right away; the game fades them all in at once, ours instead
+  for _, line in ipairs(lines) do
+    KeepOurFade(line)
     line.gftAnimating = true
+    if line.FadeInAnim then line.FadeInAnim:Stop() end
     line:SetAlpha(0)
-    local start = delay + (i - 1) * LINE_DELAY
-    Run(function (elapsed)
-      local progress = (elapsed - start) / LINE_FADE
-      if progress >= 1 then
-        line:SetAlpha(1)
+    -- Never left invisible, even if something stopped the fade
+    C_Timer.After(delay + #lines * LINE_DELAY + LINE_FADE + 1, function ()
+      if line.gftAnimating then
         line.gftAnimating = false
-        return true
+        line:SetAlpha(1)
       end
-      line:SetAlpha(math.max(0, progress))
-      return false
     end)
   end
+
+  -- Their order on screen is only known once the game has placed them, a
+  -- moment later: sort then, top to bottom
+  local order
+  Run(function (elapsed)
+    if not order then
+      table.sort(lines, function (a, b) return (a:GetTop() or 0) > (b:GetTop() or 0) end)
+      order = {}
+      for i, line in ipairs(lines) do order[line] = i end
+    end
+    local done = true
+    for _, line in ipairs(lines) do
+      if line.gftAnimating then
+        local start = delay + (order[line] - 1) * LINE_DELAY
+        local progress = (elapsed - start) / LINE_FADE
+        if progress >= 1 then
+          line:SetAlpha(1)
+          line.gftAnimating = false
+        else
+          line:SetAlpha(Ease(math.max(0, progress)))
+          done = false
+        end
+      end
+    end
+    return done
+  end)
 end
 
 Core:OnChange(function (key, block)
   if key ~= "questAdded" or not block then return end
   if not Core:Animates() then return end
-  Slide(block)
+  -- The quest's item button can't be moved in a fight: no slide then. Nor
+  -- while the whole tracker is sliding in: two slides at once looked jumpy.
+  if not InCombatLockdown() and not Core:TrackerSliding() then Slide(block) end
   local typing = TypeName(block.HeaderText)
   -- Objectives start when the name is about half written
   ShowLines(block, typing * 0.5)

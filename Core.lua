@@ -79,6 +79,7 @@ Core.defaults = {
     zoneOnly = false,         -- track only the quests of the current zone
     instanceMode = "normal",  -- in dungeons and raids: normal, hide, show or dungeon (only its quests)
     completeSound = true,     -- a sound when an objective or quest is done
+    orcVoice = true,          -- quest ready to turn in: the orc peon's "Work complete!"
   }
 }
 
@@ -116,4 +117,16 @@ end
 function Core:Animates()
   local profile = self.db.profile
   return profile.glassLook and profile.sectionAnimation == "glass"
+end
+
+---
+-- Textures snap to whole pixels by default, so ones that grow or move went
+-- in small jumps (an icon growing a few pixels had only 3 or 4 sizes).
+-- Without it they animate smoothly. Returns the texture.
+function Core.Smooth(texture)
+  if texture and texture.SetSnapToPixelGrid then
+    texture:SetSnapToPixelGrid(false)
+    texture:SetTexelSnappingBias(0)
+  end
+  return texture
 end

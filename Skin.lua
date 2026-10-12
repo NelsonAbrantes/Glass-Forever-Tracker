@@ -4,6 +4,7 @@ local Core = ns.Core
 -- luacheck: push ignore 113
 local C_Timer = C_Timer
 local CreateFrame = CreateFrame
+local GetTime = GetTime
 local hooksecurefunc = hooksecurefunc
 -- luacheck: pop
 
@@ -58,7 +59,7 @@ local function GlassAnimation(owner, anchor, kind)
   if owner.gftAnims[kind] then return owner.gftAnims[kind] end
 
   -- One line across the text, fading at both ends (the image does that)
-  local glassLine = owner:CreateTexture(nil, "ARTWORK")
+  local glassLine = Core.Smooth(owner:CreateTexture(nil, "ARTWORK"))
   glassLine:SetTexture(LINE)
   glassLine:SetHeight(1)
   glassLine:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -1)
@@ -83,7 +84,7 @@ local function GlassAnimation(owner, anchor, kind)
 
   local shine
   if not quick then
-    shine = owner:CreateTexture(nil, "OVERLAY")
+    shine = Core.Smooth(owner:CreateTexture(nil, "OVERLAY"))
     shine:SetTexture(SOFT)
     shine:SetBlendMode("ADD")
     shine:SetPoint("LEFT", anchor, "LEFT", -35, 0)
@@ -152,6 +153,33 @@ end
 local GLOW_ATLAS = "ui-questtracker-objfx-barglow"
 local FLASH_TIME = 0.45 -- how long a completed objective stays white
 
+-- The check of a completed objective pops: a little bigger, then back to
+-- its size. Worked out frame by frame and capped, unlike the game's own.
+local CHECK_SIZE, CHECK_GROW, CHECK_TIME = 16, 0.25, 0.3
+local popping = {} -- check texture -> start time
+local popper = CreateFrame("Frame")
+popper:Hide()
+popper:SetScript("OnUpdate", function ()
+  local now = GetTime()
+  for check, start in pairs(popping) do
+    local k = (now - start) / CHECK_TIME
+    if k >= 1 then
+      check:SetSize(CHECK_SIZE, CHECK_SIZE)
+      popping[check] = nil
+    else
+      local size = CHECK_SIZE * (1 + CHECK_GROW * math.sin(math.pi * k))
+      check:SetSize(size, size)
+    end
+  end
+  if next(popping) == nil then popper:Hide() end
+end)
+
+local function PopCheck(check)
+  Core.Smooth(check) -- grows smoothly, not pixel by pixel
+  popping[check] = GetTime()
+  popper:Show()
+end
+
 local function GlassAnimations()
   local profile = Profile()
   return profile.glassLook and profile.sectionAnimation ~= "game"
@@ -167,6 +195,7 @@ local function SetGlow(texture)
 end
 
 local hookedBlocks, hookedLines = {}, {}
+local ADDED_AGAIN = 1 -- seconds: the same quest again this soon isn't new
 
 local function HookBlock(block)
   if hookedBlocks[block] then return end
@@ -174,6 +203,13 @@ local function HookBlock(block)
   SetGlow(block.HeaderGlow)
   local function Play(added)
     SetGlow(block.HeaderGlow)
+    -- The game can report the same new quest twice: starting it all over
+    -- halfway looked like a jump
+    if added then
+      local now = GetTime()
+      if block.gftAddedID == block.id and now - (block.gftAddedAt or 0) < ADDED_AGAIN then return end
+      block.gftAddedAt, block.gftAddedID = now, block.id
+    end
     if GlassAnimations() and Profile().sectionAnimation ~= "off" and block.HeaderText then
       Core:Changed("sectionAdded") -- shows the tracker
       if Core:Animates() then
@@ -213,10 +249,19 @@ local function HookLine(line)
     if line.GlowAnim:IsPlaying() then Play() end
   end
 
-  -- An objective completed (the game shows its green check): the text lights
-  -- up white for a moment and goes back to its color
+  -- An objective completed (the game shows its green check). The game's own
+  -- animation makes the check grow, and growing animations go wrong in this
+  -- game version (the check flew at the screen, huge): it's stopped, and the
+  -- check pops by hand instead. Then the text lights up white for a moment
+  -- and goes back to its color.
   if line.CheckAnim then
     line.CheckAnim:HookScript("OnPlay", function ()
+      line.CheckAnim:Stop()
+      if line.CheckGlow then line.CheckGlow:SetAlpha(0) end
+      if line.Icon then
+        line.Icon:SetAlpha(1)
+        if Core:Animates() then PopCheck(line.Icon) end
+      end
       if not Core:Animates() or not line.Text then return end
       local text = line.Text
       local r, g, b = text:GetTextColor()

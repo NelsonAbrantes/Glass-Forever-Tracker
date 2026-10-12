@@ -224,6 +224,7 @@ local function Build()
     { "dungeon", "Dungeon quests only" },
   }, "What the tracker does in dungeons and raids. Dungeon quests only: while you're inside, it tracks only the quests of that dungeon or raid, and the others again when you leave (changes wait for the end of a fight)")
   Checkbox(category, "completeSound", "Sound on complete", "A discreet sound when a quest objective is done, and another when a quest is ready to turn in")
+  Checkbox(category, "orcVoice", "Orc voice on quest complete", "When a quest is ready to turn in, an orc peon says \"Work complete!\" instead of the usual sound. Needs Sound on complete")
 
   Settings.RegisterAddOnCategory(category)
   return category

@@ -31,7 +31,7 @@ background:SetFrameStrata("BACKGROUND")
 background:EnableMouse(false)
 Core.background = background
 
-local texture = background:CreateTexture(nil, "BACKGROUND")
+local texture = Core.Smooth(background:CreateTexture(nil, "BACKGROUND")) -- slides smoothly with the tracker
 texture:SetAllPoints()
 texture:SetTexture(TEXTURE)
 if texture.SetTextureSliceMargins then

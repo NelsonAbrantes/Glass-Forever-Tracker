@@ -78,6 +78,12 @@ local function SlideIn()
   end
 end
 
+-- True while the tracker slides in (Animations.lua leaves a new quest's own
+-- slide out then)
+function Core:TrackerSliding()
+  return slides ~= nil and slides[1]:IsPlaying()
+end
+
 local ticker = CreateFrame("Frame", nil, UIParent)
 ticker:SetScript("OnUpdate", function (_, elapsed)
   local profile = Profile()

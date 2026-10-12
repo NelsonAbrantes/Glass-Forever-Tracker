@@ -6,6 +6,7 @@ local C_QuestLog = C_QuestLog
 local C_Timer = C_Timer
 local CreateFrame = CreateFrame
 local PlaySound = PlaySound
+local PlaySoundFile = PlaySoundFile
 local SOUNDKIT = SOUNDKIT
 -- luacheck: pop
 
@@ -15,6 +16,9 @@ local SOUNDKIT = SOUNDKIT
 -- A discreet sound when a quest objective is done, and another when a quest
 -- is ready to turn in (Options: Sound on complete). Works from the quest log,
 -- comparing it with how it was a moment before.
+
+-- The orc peon's "Work complete!" (Options: Orc voice on quest complete)
+local ORC_VOICE = 558132 -- Sound/Creature/Peon/PeonBuildingComplete1.ogg
 
 -- questID -> { done = finished objectives, complete = ready to turn in }
 local known
@@ -54,7 +58,9 @@ local function Check()
       end
     end
     -- One sound at a time: a finished quest wins over its last objective
-    if questDone then
+    if questDone and Core.db.profile.orcVoice then
+      PlaySoundFile(ORC_VOICE)
+    elseif questDone then
       Play(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE)
     elseif objectiveDone then
       Play(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)

@@ -114,7 +114,7 @@ end
 
 local function SpawnParticle(x, y, r, g, b)
   if #liveParticles >= MAX_PARTICLES then return end
-  local speck = table.remove(particles) or stage:CreateTexture(nil, "OVERLAY")
+  local speck = table.remove(particles) or Core.Smooth(stage:CreateTexture(nil, "OVERLAY"))
   speck:SetTexture(FLAT)
   local size = 1 + math.random() * 2
   speck:SetSize(size, size)
