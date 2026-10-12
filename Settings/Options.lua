@@ -274,6 +274,17 @@ Core:OnChange(function (key)
       print("  glassLook", tostring(profile.glassLook), "iconColor", tostring(profile.iconColor),
         "questNameColor", tostring(profile.questNameColor), "animation", tostring(profile.sectionAnimation))
       print("  sections", modules, "with animation hooked", hooked, "quest icons", pois, "quest names", names)
+      local bg = Core.background
+      local texture = bg and bg:GetRegions()
+      if texture then
+        local r, g, b, a = texture:GetVertexColor()
+        print(("  background shown %s size %dx%d alpha %.2f color %.2f %.2f %.2f %.2f texture %s"):format(
+          tostring(bg:IsShown()), bg:GetWidth(), bg:GetHeight(), texture:GetAlpha(),
+          r or 0, g or 0, b or 0, a or 0, tostring(texture:GetTexture())))
+        print("  opacity", tostring(profile.backgroundOpacity), "bgsize", tostring(profile.backgroundSize),
+          "slices", tostring(texture.GetTextureSliceMargins and texture:GetTextureSliceMargins()),
+          "scale", ("%.2f"):format(bg:GetEffectiveScale()))
+      end
       Core:IconsDetails()
       return
     end

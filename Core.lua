@@ -13,7 +13,8 @@ Core.GOLD = { r = 223 / 255, g = 186 / 255, b = 105 / 255 }
 
 -- Colors offered in the options (the Glass Forever accent colors), in order
 Core.COLORS = {
-  { "gold", "Gold", { Core.GOLD.r, Core.GOLD.g, Core.GOLD.b } },
+  -- Brighter and yellower than the Glass gold, so it stands apart from bronze
+  { "gold", "Gold", { 1.00, 0.82, 0.22 } },
   { "white", "White", { 1, 1, 1 } },
   { "silver", "Silver", { 0.75, 0.76, 0.80 } },
   { "bronze", "Bronze", { 0.88, 0.62, 0.36 } },

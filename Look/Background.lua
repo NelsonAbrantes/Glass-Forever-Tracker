@@ -41,15 +41,23 @@ if texture.SetTextureSliceMargins then
   end
 end
 
+-- With nothing in the tracker (no quests here, or the last one just left)
+-- the background fades out, and back in when something shows
+local PRESENCE_FADE = 0.4 -- seconds
+local presence, presenceTarget = 1, 1
+
+-- The chosen opacity and the fade out when empty go together in the color's
+-- alpha (in this game version a texture's own alpha replaces it instead)
 function background:UpdateColor()
   local profile = Core.db.profile
   local opacity = profile.glassLook and profile.backgroundOpacity or 0
   local color = BACKGROUND_COLORS[profile.backgroundColor] or BACKGROUND_COLORS.black
-  texture:SetVertexColor(color[1], color[2], color[3], opacity)
+  texture:SetVertexColor(color[1], color[2], color[3], opacity * presence)
 end
 
 -- The lowest point with something shown: the bottom of the last section, or
--- the tracker's own title when everything is collapsed
+-- the tracker's own title when everything is collapsed. Nil when nothing is
+-- shown at all.
 local function ContentBottom(tracker)
   local bottom
   for _, module in ipairs(tracker.modules or {}) do
@@ -60,7 +68,7 @@ local function ContentBottom(tracker)
       end
     end
   end
-  if not bottom and tracker.Header then
+  if not bottom and tracker.Header and tracker.Header:IsVisible() then
     bottom = tracker.Header:GetBottom()
   end
   return bottom
@@ -69,7 +77,12 @@ end
 function background:UpdateSize()
   local tracker = self.tracker
   local top, bottom = tracker:GetTop(), ContentBottom(tracker)
-  if not top or not bottom then return end
+  presenceTarget = (top and bottom) and 1 or 0
+  if presence ~= presenceTarget then self.fading = true end
+  if not top or not bottom then
+    self.contentHeight = 0 -- nothing for the mouse to be over (Fade.lua)
+    return
+  end
 
   local height = math.floor(top - bottom + 0.5)
   if height == self.contentHeight then return end
@@ -95,6 +108,17 @@ function background:Attach(tracker)
     if elapsedTotal >= UPDATE_EVERY then
       elapsedTotal = 0
       self:UpdateSize()
+    end
+    -- Fading out or in: every frame, only while it moves
+    if self.fading then
+      local step = elapsed / PRESENCE_FADE
+      if presenceTarget > presence then
+        presence = math.min(presenceTarget, presence + step)
+      else
+        presence = math.max(presenceTarget, presence - step)
+      end
+      self:UpdateColor()
+      if presence == presenceTarget then self.fading = false end
     end
   end)
 end
