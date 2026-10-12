@@ -120,6 +120,13 @@ function Core:Animates()
 end
 
 ---
+-- /gft animlog: writes in chat when animations start, to find problems
+function Core:AnimLog(...)
+  if not self.animLog then return end
+  print(("|cffdfba69GFT|r %.2f"):format(GetTime()), ...)
+end
+
+---
 -- Textures snap to whole pixels by default, so ones that grow or move went
 -- in small jumps (an icon growing a few pixels had only 3 or 4 sizes).
 -- Without it they animate smoothly. Returns the texture.

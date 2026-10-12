@@ -8,7 +8,7 @@ local hooksecurefunc = hooksecurefunc
 -- luacheck: pop
 
 local ASSETS = "Interface\\AddOns\\GlassForeverTracker\\Assets\\"
-local SCAN_EVERY = 0.3
+local SCAN_EVERY = 0.5
 
 ----
 -- Icons
@@ -108,21 +108,18 @@ end
 -- go past MAX_SCALE.
 -- - Pulse: a quest ready to turn in, its "?" a little bigger and fainter,
 --   then back, over and over
--- - Pop: a quest just added, its icon grows past its size and settles, while
---   a soft ring opens around it
+-- - Ring: a quest just added, a soft ring opens around its icon
 local ICON_SIZE = 16
 local MAX_SCALE = 1.5
 local PULSE_TIME = 0.7   -- seconds to grow (and as many to come back)
 local PULSE_GROW = 0.18  -- 18% bigger at the top
-local POP_GROW, POP_SETTLE = 0.25, 0.25
-local POP_FROM, POP_TOP = 0.6, 1.15 -- starts at 60% of its size, peaks at 115%
-local RING_TIME, RING_SIZE = 0.6, 30
+local RING_TIME, RING_SIZE = 1.0, 30
+local RING_LIGHT_UP = 0.25 -- part of the time it takes to light up
+local PULSE_EASE = 0.4     -- seconds the "?" pulse takes to calm down or come back around the ring
 
-local animated = {} -- button -> { pulse = start time, pop = start time, ring = start time }
+local animated = {} -- button -> { pulse = start time, ring = start time }
 local animator = CreateFrame("Frame")
 animator:Hide()
-
-local function EaseOut(k) return 1 - (1 - k) * (1 - k) end
 
 animator:SetScript("OnUpdate", function ()
   local now = GetTime()
@@ -130,34 +127,38 @@ animator:SetScript("OnUpdate", function ()
     local scale, alpha = 1, 1
 
     if state.pulse then
-      local t = (now - state.pulse) % (PULSE_TIME * 2)
+      -- On a shared clock, not from its start: the game redoes the icons
+      -- often (any quest log change), which restarted the pulse halfway
+      local t = now % (PULSE_TIME * 2)
       local wave = 0.5 - 0.5 * math.cos(math.pi * t / PULSE_TIME)
+      -- Quiet while the ring opens (both together looked like a double
+      -- pulse): it eases out as the ring starts and back in after it ends
+      local strength = 1
+      if state.ring then
+        strength = 1 - math.min(1, (now - state.ring) / PULSE_EASE)
+      elseif state.ringEnded then
+        strength = math.min(1, (now - state.ringEnded) / PULSE_EASE)
+        if strength >= 1 then state.ringEnded = nil end
+      end
+      wave = wave * strength * strength * (3 - 2 * strength)
       scale = scale * (1 + PULSE_GROW * wave)
       alpha = 1 - 0.4 * wave
-    end
-
-    if state.pop then
-      local e = now - state.pop
-      if e < POP_GROW then
-        scale = scale * (POP_FROM + (POP_TOP - POP_FROM) * EaseOut(e / POP_GROW))
-      elseif e < POP_GROW + POP_SETTLE then
-        local k = (e - POP_GROW) / POP_SETTLE
-        scale = scale * (POP_TOP - (POP_TOP - 1) * k * k * (3 - 2 * k))
-      else
-        state.pop = nil
-      end
     end
 
     if state.ring and button.gftRing then
       local k = (now - state.ring) / RING_TIME
       if k < 1 then
-        local size = RING_SIZE * (0.4 + 1.2 * EaseOut(k))
+        -- Opens with a soft start and end, lights up gently at first and
+        -- fades out smoothly at the end
+        local size = RING_SIZE * (0.6 + 0.9 * k * k * (3 - 2 * k))
         button.gftRing:SetSize(size, size)
-        button.gftRing:SetAlpha(0.9 * (1 - k))
+        local light = k < RING_LIGHT_UP and k / RING_LIGHT_UP or (1 - k) / (1 - RING_LIGHT_UP)
+        button.gftRing:SetAlpha(0.8 * light * light * (3 - 2 * light))
       else
         button.gftRing:SetAlpha(0)
         button.gftRing:Hide()
         state.ring = nil
+        state.ringEnded = now
       end
     end
 
@@ -167,7 +168,7 @@ animator:SetScript("OnUpdate", function ()
     button.gftOutline:SetSize(size, size)
     button.gftOutline:SetAlpha(alpha)
 
-    if not (state.pulse or state.pop or state.ring) then
+    if not (state.pulse or state.ring) then
       animated[button] = nil
     end
   end
@@ -181,6 +182,7 @@ local function Animate(button, key, on)
       state = {}
       animated[button] = state
     end
+    if key == "pulse" and not state.pulse then Core:AnimLog("? pulse starts", tostring(button)) end
     if key ~= "pulse" or not state.pulse then state[key] = GetTime() end
     animator:Show()
   elseif state and state[key] then
@@ -238,9 +240,14 @@ local function StylePoi(button)
   button:HookScript("OnShow", UpdatePoi)
   -- The game's own entrance makes the whole icon grow, and growing
   -- animations go wrong in this game version: it's stopped (the Glass icon
-  -- has its own pop)
+  -- has its own ring)
+  -- The game starts it with Play or with Restart, and Restart doesn't fire
+  -- OnPlay: both are caught
   if button.AddAnim then
-    button.AddAnim:HookScript("OnPlay", function (group) group:Stop() end)
+    local group = button.AddAnim
+    group:HookScript("OnPlay", function () group:Stop() end)
+    hooksecurefunc(group, "Restart", function () group:Stop() end)
+    hooksecurefunc(group, "Play", function () group:Stop() end)
   end
   UpdatePoi(button)
 end
@@ -267,10 +274,13 @@ local function EnforcePoi(button)
   end
 end
 
--- A quest just added (Animations: Glass): its icon pops (grows past its size
--- and settles) and a soft ring opens around it, in the icon color
-local function PopIcon(button)
-  if not button or not button.gftIcon or not button.gftStyled then return end
+-- A quest just added (Animations: Glass): a soft ring opens around its icon,
+-- in the icon color
+local function RingIcon(button)
+  if not button or not button.gftIcon or not button.gftStyled then
+    Core:AnimLog("ring skipped: icon not ready", tostring(button))
+    return
+  end
   if not button.gftRing then
     local ring = Smooth(button:CreateTexture(nil, "OVERLAY", nil, 5))
     ring:SetTexture(ASSETS.."ring")
@@ -279,10 +289,19 @@ local function PopIcon(button)
     ring:SetAlpha(0)
     button.gftRing = ring
   end
+  -- Already opening: the game can report the same new quest again a moment
+  -- later, and starting over halfway looked like a jump back
+  local state = animated[button]
+  if state and state.ring and GetTime() - state.ring < RING_TIME then
+    Core:AnimLog("ring skipped: already opening", tostring(button))
+    return
+  end
+  Core:AnimLog("ring starts", tostring(button), "quest", tostring(button.questID))
   local r, g, b = button.gftIcon:GetVertexColor()
   button.gftRing:SetVertexColor(r, g, b)
   button.gftRing:Show()
-  Animate(button, "pop", true)
+  -- Only the ring: the icon also growing at the same time looked like a
+  -- double pulse
   Animate(button, "ring", true)
 end
 
@@ -459,7 +478,7 @@ Core:OnChange(function (key, ...)
     local block = ...
     if block and block.poiButton and Core:Animates() then
       StylePoi(block.poiButton)
-      PopIcon(block.poiButton)
+      RingIcon(block.poiButton)
     end
   elseif key == "glassLook" or key == "iconColor" or key == "iconOutline" or key == "sectionAnimation" or key == "profile" then
     UpdateAll()

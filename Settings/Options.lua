@@ -247,6 +247,17 @@ Core:OnChange(function (key)
       end
       return
     end
+    -- /gft animlog: animation messages in chat, on or off
+    if input and input:lower():match("^%s*animlog") then
+      Core.animLog = not Core.animLog
+      print("|cffdfba69Glass Forever Tracker|r: animation log", Core.animLog and "on" or "off")
+      return
+    end
+    -- /gft zone: what "Only quests in this zone" decides for each quest
+    if input and input:lower():match("^%s*zone") then
+      Core:ZoneDebug()
+      return
+    end
     -- /gft debug: what the addon sees, to find problems
     if input and input:lower():match("^%s*debug") then
       local profile = Profile()

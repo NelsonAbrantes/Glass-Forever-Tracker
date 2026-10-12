@@ -119,9 +119,33 @@ local function MouseOverQuests()
   return tracker:IsMouseOver(8, empty - 8, -8, 8) and not OtherWindowOnTop()
 end
 
+-- Moves towards the target over the fade in / fade out duration
+local function MoveAlpha(profile, elapsed)
+  local duration = state.target > state.alpha and profile.fadeInDuration or profile.fadeOutDuration
+  local step = duration > 0 and elapsed / duration or 1
+  if state.target > state.alpha then
+    state.alpha = math.min(state.target, state.alpha + step)
+  else
+    state.alpha = math.max(state.target, state.alpha - step)
+  end
+  Apply(state.alpha)
+end
+
+-- Where it should be (shown or faded) is worked out 20 times a second, which
+-- feels instant; only the fade itself moves every frame, and only while it
+-- moves
+local CHECK_EVERY = 0.05
+local sinceCheck = CHECK_EVERY
+
 local ticker = CreateFrame("Frame", nil, UIParent)
 ticker:SetScript("OnUpdate", function (_, elapsed)
   local profile = Profile()
+  sinceCheck = sinceCheck + elapsed
+  if sinceCheck < CHECK_EVERY then
+    if state.alpha ~= state.target then MoveAlpha(profile, elapsed) end
+    return
+  end
+  sinceCheck = 0
 
   local mouseOver = MouseOverQuests()
   if mouseOver ~= state.mouseOver then
@@ -148,17 +172,7 @@ ticker:SetScript("OnUpdate", function (_, elapsed)
   end
   state.target = target
 
-  -- Move towards the target over the fade in / fade out duration
-  if state.alpha ~= state.target then
-    local duration = state.target > state.alpha and profile.fadeInDuration or profile.fadeOutDuration
-    local step = duration > 0 and elapsed / duration or 1
-    if state.target > state.alpha then
-      state.alpha = math.min(state.target, state.alpha + step)
-    else
-      state.alpha = math.max(state.target, state.alpha - step)
-    end
-    Apply(state.alpha)
-  end
+  if state.alpha ~= state.target then MoveAlpha(profile, elapsed) end
 end)
 
 -- Something else changing the tracker's transparency (e.g. the game) gets

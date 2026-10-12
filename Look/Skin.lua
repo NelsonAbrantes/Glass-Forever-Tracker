@@ -195,7 +195,8 @@ local function SetGlow(texture)
 end
 
 local hookedBlocks, hookedLines = {}, {}
-local ADDED_AGAIN = 1 -- seconds: the same quest again this soon isn't new
+local ADDED_AGAIN = 5 -- seconds: the same quest again this soon isn't new (the game can report it twice, a second or two apart)
+local lastAdded = {} -- quest -> when it was last reported new
 
 local function HookBlock(block)
   if hookedBlocks[block] then return end
@@ -205,10 +206,23 @@ local function HookBlock(block)
     SetGlow(block.HeaderGlow)
     -- The game can report the same new quest twice: starting it all over
     -- halfway looked like a jump
-    if added then
+    -- (by quest, not by block: the game can move it to another block)
+    if added and block.id then
       local now = GetTime()
-      if block.gftAddedID == block.id and now - (block.gftAddedAt or 0) < ADDED_AGAIN then return end
-      block.gftAddedAt, block.gftAddedID = now, block.id
+      if now - (lastAdded[block.id] or 0) < ADDED_AGAIN then
+        Core:AnimLog("new quest again, ignored", tostring(block.id))
+        return
+      end
+      lastAdded[block.id] = now
+      -- Tracked again by "Only quests in this zone", not a new quest: a
+      -- quieter entrance (Animations.lua)
+      local rewatched = Core.rewatched and Core.rewatched[block.id]
+      if rewatched and now - rewatched < ADDED_AGAIN then
+        Core:AnimLog("quest back from the zone filter", tostring(block.id))
+        if Core:Animates() then Core:Changed("questBack", block) end
+        return
+      end
+      Core:AnimLog("new quest", tostring(block.id), tostring(block.HeaderText and block.HeaderText:GetText()))
     end
     if GlassAnimations() and Profile().sectionAnimation ~= "off" and block.HeaderText then
       Core:Changed("sectionAdded") -- shows the tracker
@@ -401,24 +415,43 @@ end
 -- set up by the game a while after login, so the art is checked again now
 -- and then (cheap: it only sets transparency).
 local CHECK_EVERY = 1
-local QUEST_CHECK_EVERY = 0.05
+
+-- Each quest the game places in a section gets its animations hooked right
+-- then, so new quests animate as soon as they show (this used to be a check
+-- of every quest 20 times a second)
+local hookedModules = {}
+local function HookModule(module)
+  if hookedModules[module] or not module.LayoutBlock then return end
+  hookedModules[module] = true
+  hooksecurefunc(module, "LayoutBlock", function (_, block)
+    if not block then return end
+    if block.AddAnim then HookBlock(block) end
+    for _, line in pairs(block.usedLines or {}) do
+      if line.GlowAnim then HookLine(line) end
+    end
+  end)
+end
+
 local function HookModules()
   if tracker.AddModule and not Core:IsHooked(tracker, "AddModule") then
-    Core:SecureHook(tracker, "AddModule", SkinArt)
+    Core:SecureHook(tracker, "AddModule", function (_, module)
+      SkinArt()
+      if module then HookModule(module) end
+    end)
   end
+  for _, module in ipairs(tracker.modules or {}) do HookModule(module) end
+  HookQuestAnimations()
 
+  -- A safety check now and then: art the game shows again, sections or
+  -- quests missed
   local checker = CreateFrame("Frame")
-  local elapsedTotal, questElapsed = 0, 0
+  local elapsedTotal = 0
   checker:SetScript("OnUpdate", function (_, elapsed)
     elapsedTotal = elapsedTotal + elapsed
-    questElapsed = questElapsed + elapsed
     if elapsedTotal >= CHECK_EVERY then
       elapsedTotal = 0
       SkinArt()
-    end
-    -- New quests play their animation as soon as they show: checked often
-    if questElapsed >= QUEST_CHECK_EVERY then
-      questElapsed = 0
+      for _, module in ipairs(tracker.modules or {}) do HookModule(module) end
       HookQuestAnimations()
     end
   end)

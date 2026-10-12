@@ -20,16 +20,16 @@ libs\LibEditMode\embed.xml
 
 # Addon
 Core.lua
-Background.lua
-Fade.lua
-Skin.lua
-Icons.lua
-Sounds.lua
-ZoneFilter.lua
-Extras.lua
-Animations.lua
-Dust.lua
-Width.lua
-VersionCheck.lua
-Options.lua
-EditMode.lua
+Look\Background.lua
+Behavior\Fade.lua
+Look\Skin.lua
+Look\Icons.lua
+Behavior\Sounds.lua
+Behavior\ZoneFilter.lua
+Look\Extras.lua
+Animations\Animations.lua
+Animations\Dust.lua
+Behavior\Width.lua
+Behavior\VersionCheck.lua
+Settings\Options.lua
+Settings\EditMode.lua

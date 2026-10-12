@@ -15,7 +15,13 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - Sound on complete: a sound when an objective is done and another when a quest is ready to turn in; with "Orc voice on quest complete" (on by default) an orc peon says "Work complete!" instead (`Sounds.lua`).
 - Animations (Glass, Game or Off): titles light up with a thin line and a shine, objective progress line, completed objectives flash white, the "?" of quests ready to turn in pulses, the tracker slides in, and new quests slide in, write their name, pop their icon with a ring and show their objectives one by one; an abandoned quest turns to dust and blows away (`Skin.lua`, `Icons.lua`, `Animations.lua`, `Fade.lua`, `Dust.lua`).
 - Update notice: the addon quietly tells other players in your guild and group which version it has; if someone has a newer one, a message in chat says so (once per session) (`VersionCheck.lua`).
-- `/gft debug` and `/gft testanim` to help find problems.
+- `/gft debug`, `/gft testanim`, `/gft zone` and `/gft animlog` to help find problems.
+- Quests coming back when you change zone fade in one by one, top to bottom; a quest accepted for another zone stays a few seconds and fades out before it goes (`Animations.lua`, `ZoneFilter.lua`).
+
+### Changed
+- Files sorted into folders: `Look`, `Animations`, `Behavior` and `Settings`.
+- Lighter on performance: new quests are caught when the game places them instead of checking every quest 20 times a second, and the fade checks the mouse 20 times a second instead of every frame (`Skin.lua`, `Fade.lua`, `Icons.lua`).
+- New quests get only the soft ring (the icon no longer grows too), and the "?" pulse calms down while the ring opens (`Icons.lua`).
 
 ### Fixed
 - Switching the quest name color back to "Game colors" now restores the game's colors (and inline colors) right away (`Icons.lua`).
@@ -25,3 +31,5 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - The tracker showed up with the mouse over the empty part of its box (down to its Edit Mode height) or over a window on top of it, like the bags. Now only the quests themselves count (`Fade.lua`).
 - After a /reload inside a dungeon, "Dungeon quests only" showed every quest: the game puts them back a few seconds after loading, so the filter is applied again then (`ZoneFilter.lua`).
 - Quest icons no longer go back to the game's art, and the gold ring no longer stays after accepting a quest (`Icons.lua`).
+- "Only quests in this zone" kept quests of nearby zones (The Barrens' quests in Mulgore): a quest of another zone now counts only if its marker is inside this zone's map (`ZoneFilter.lua`).
+- Quests tracked again by the zone filter no longer play the new quest animation, and a new quest reported twice no longer restarts it (`Skin.lua`, `ZoneFilter.lua`).

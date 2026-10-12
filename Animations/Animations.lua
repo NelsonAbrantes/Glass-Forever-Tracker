@@ -148,7 +148,94 @@ local function ShowLines(block, delay)
   end)
 end
 
+-- Quests coming back when you change zone ("Only quests in this zone"): they
+-- fade in one by one, top to bottom, in a quiet cascade
+local BACK_DELAY = 0.08 -- between one quest and the next
+local BACK_FADE = 0.35
+local BURST = 0.5       -- quests coming back this close together are one cascade
+local burst
+
+local function FadeBack(block)
+  local now = GetTime()
+  if not burst or now - burst.last > BURST then
+    burst = { blocks = {}, sorted = false, last = now }
+    local current = burst
+    Run(function (elapsed)
+      -- Their order on screen is known once the game has placed them
+      if not current.sorted then
+        table.sort(current.blocks, function (a, b) return (a.block:GetTop() or 0) > (b.block:GetTop() or 0) end)
+        current.sorted = true
+      end
+      local done = true
+      for i, entry in ipairs(current.blocks) do
+        local b = entry.block
+        if b.gftFading then
+          -- Reused for another quest meanwhile: shown as it is
+          if b.id ~= entry.id then
+            b.gftFading = false
+            b:SetAlpha(1)
+          else
+            local progress = (elapsed - (i - 1) * BACK_DELAY) / BACK_FADE
+            if progress >= 1 then
+              b:SetAlpha(1)
+              b.gftFading = false
+            else
+              b:SetAlpha(Ease(math.max(0, progress)))
+              done = false
+            end
+          end
+        end
+      end
+      return done
+    end)
+  end
+  burst.last = now
+  block.gftFading = true
+  block:SetAlpha(0)
+  table.insert(burst.blocks, { block = block, id = block.id })
+  -- Never left invisible
+  C_Timer.After(2, function ()
+    if block.gftFading then
+      block.gftFading = false
+      block:SetAlpha(1)
+    end
+  end)
+end
+
+---
+-- A quest leaving the tracker ("Only quests in this zone"): it fades out,
+-- then `done` runs (which stops tracking it)
+local LEAVE_FADE = 0.6
+function Core:FadeOutBlock(block, done)
+  local id = block.id
+  Run(function (elapsed)
+    -- Reused for another quest meanwhile: left as it is
+    if block.id ~= id then
+      block:SetAlpha(1)
+      done()
+      return true
+    end
+    local progress = elapsed / LEAVE_FADE
+    if progress >= 1 then
+      block:SetAlpha(0)
+      done()
+      -- The game frees the block once the quest is gone; if it stays,
+      -- it's shown again
+      C_Timer.After(1, function ()
+        if block.id == id and block:GetAlpha() == 0 then block:SetAlpha(1) end
+      end)
+      return true
+    end
+    block:SetAlpha(1 - Ease(progress))
+    return false
+  end)
+end
+
 Core:OnChange(function (key, block)
+  if key == "questBack" and block then
+    FadeBack(block)
+    return
+  end
   if key ~= "questAdded" or not block then return end
   if not Core:Animates() then return end
   -- The quest's item button can't be moved in a fight: no slide then. Nor
