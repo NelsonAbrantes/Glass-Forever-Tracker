@@ -8,6 +8,7 @@ local CreateFrame = CreateFrame
 local PlaySound = PlaySound
 local PlaySoundFile = PlaySoundFile
 local SOUNDKIT = SOUNDKIT
+local wipe = wipe
 -- luacheck: pop
 
 ----
@@ -20,23 +21,31 @@ local SOUNDKIT = SOUNDKIT
 -- The orc peon's "Work complete!" (Options: Orc voice on quest complete)
 local ORC_VOICE = 558132 -- Sound/Creature/Peon/PeonBuildingComplete1.ogg
 
--- questID -> { done = finished objectives, complete = ready to turn in }
-local known
+-- How the quest log was, and how it is now: questID -> finished objectives,
+-- and questID -> ready to turn in. Two sets of tables, swapped and reused on
+-- every check (new ones every time were garbage for the game to clean up).
+local knownDone, knownComplete = {}, {}
+local nowDone, nowComplete = {}, {}
+local hasKnown = false
 
 local function Snapshot()
-  local quests = {}
-  if not (C_QuestLog and C_QuestLog.GetNumQuestLogEntries) then return quests end
+  wipe(nowDone)
+  wipe(nowComplete)
+  if not (C_QuestLog and C_QuestLog.GetNumQuestLogEntries) then return end
   for i = 1, C_QuestLog.GetNumQuestLogEntries() do
     local info = C_QuestLog.GetInfo(i)
     if info and not info.isHeader and info.questID then
       local done = 0
-      for _, objective in ipairs(C_QuestLog.GetQuestObjectives(info.questID) or {}) do
-        if objective.finished then done = done + 1 end
+      local objectives = C_QuestLog.GetQuestObjectives(info.questID)
+      if objectives then
+        for _, objective in ipairs(objectives) do
+          if objective.finished then done = done + 1 end
+        end
       end
-      quests[info.questID] = { done = done, complete = C_QuestLog.IsComplete(info.questID) and true or false }
+      nowDone[info.questID] = done
+      nowComplete[info.questID] = C_QuestLog.IsComplete(info.questID) and true or false
     end
   end
-  return quests
 end
 
 local function Play(sound)
@@ -44,15 +53,21 @@ local function Play(sound)
 end
 
 local function Check()
-  local now = Snapshot()
-  if known and Core.db.profile.completeSound then
+  -- Sound off: nothing to compare (the first check after turning it on
+  -- only remembers how things are)
+  if not Core.db.profile.completeSound then
+    hasKnown = false
+    return
+  end
+  Snapshot()
+  if hasKnown then
     local questDone, objectiveDone = false, false
-    for questID, quest in pairs(now) do
-      local before = known[questID]
+    for questID, done in pairs(nowDone) do
+      local before = knownDone[questID]
       if before then
-        if quest.complete and not before.complete then
+        if nowComplete[questID] and not knownComplete[questID] then
           questDone = true
-        elseif quest.done > before.done then
+        elseif done > before then
           objectiveDone = true
         end
       end
@@ -66,7 +81,10 @@ local function Check()
       Play(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
     end
   end
-  known = now
+  -- Now becomes how it was; the old tables are reused next time
+  knownDone, nowDone = nowDone, knownDone
+  knownComplete, nowComplete = nowComplete, knownComplete
+  hasKnown = true
 end
 
 -- The quest log changes in bursts: check once after each burst

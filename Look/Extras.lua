@@ -34,13 +34,21 @@ local function QuestCount()
 end
 
 local countText -- the Quests title's text
+local shownBase, shownQuests, shownMax -- what the title shows now
+
 local function UpdateCount()
   if not countText or not countText.gftBase then return end
-  local text = countText.gftBase
-  if Profile().questCount then
-    local quests, max = QuestCount()
-    if quests then text = string.format("%s  %d/%d", text, quests, max) end
+  local base = countText.gftBase
+  local quests, max
+  if Profile().questCount then quests, max = QuestCount() end
+  -- The quest log changes very often (many times a second in a fight): the
+  -- title is only set again when something in it actually changed
+  if countText.gftShown and base == shownBase and quests == shownQuests and max == shownMax then
+    return
   end
+  shownBase, shownQuests, shownMax = base, quests, max
+  local text = quests and string.format("%s  %d/%d", base, quests, max) or base
+  countText.gftShown = true
   countText.gftSetting = true
   countText:SetText(text)
   countText.gftSetting = false
@@ -56,6 +64,7 @@ local function SetupCount()
   hooksecurefunc(text, "SetText", function (_, value)
     if text.gftSetting then return end
     text.gftBase = value
+    text.gftShown = nil -- the game changed it: ours goes back on
     UpdateCount()
   end)
   UpdateCount()
@@ -122,19 +131,37 @@ local DIM_ALPHA = 0.35
 -- Lines in the "complete" style that aren't finished objectives
 local NOT_OBJECTIVES = { QuestComplete = true, ClickComplete = true }
 
+-- Lines this has dimmed: only those are touched again (to undim them), so
+-- with the option off nothing is checked at all
+local dimmed = {}
+
 local function DimCompleted()
+  if Profile().completedObjectives ~= "dim" then
+    for line in pairs(dimmed) do
+      if not line.gftAnimating then line:SetAlpha(1) end
+      dimmed[line] = nil
+    end
+    return
+  end
+
   local colors = _G.OBJECTIVE_TRACKER_COLOR
   local complete = colors and colors.Complete
-  local dim = Profile().completedObjectives == "dim"
   for _, module in ipairs(tracker.modules or {}) do
     for _, blocks in pairs(module.usedBlocks or {}) do
       for _, block in pairs(blocks) do
         for key, line in pairs(block.usedLines or {}) do
           local done = complete and line.Text and line.Text.colorStyle == complete
             and not NOT_OBJECTIVES[key]
-          -- Not while it's appearing (Animations.lua)
+          -- Not while it's appearing (Animations.lua); and only when it changes
           if not line.gftAnimating then
-            line:SetAlpha((dim and done) and DIM_ALPHA or 1)
+            -- (the game may have shown it fully again meanwhile)
+            if done and (not dimmed[line] or line:GetAlpha() > DIM_ALPHA + 0.01) then
+              dimmed[line] = true
+              line:SetAlpha(DIM_ALPHA)
+            elseif not done and dimmed[line] then
+              dimmed[line] = nil
+              line:SetAlpha(1)
+            end
           end
         end
       end

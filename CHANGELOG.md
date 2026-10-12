@@ -22,6 +22,7 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - Files sorted into folders: `Look`, `Animations`, `Behavior` and `Settings`.
 - Lighter on performance: new quests are caught when the game places them instead of checking every quest 20 times a second, and the fade checks the mouse 20 times a second instead of every frame (`Skin.lua`, `Fade.lua`, `Icons.lua`).
 - New quests get only the soft ring (the icon no longer grows too), and the "?" pulse calms down while the ring opens (`Icons.lua`).
+- Lighter in fights: the "Quests 12/25" title is only set again when the count changes, the complete sound reuses its tables (and does nothing when off), and dimmed objectives are only touched when they change (`Extras.lua`, `Sounds.lua`).
 - The "Gold" color is brighter and yellower, so it stands apart from bronze (`Core.lua`).
 - The Glass background fades out when the tracker has nothing in it (no quests in this zone, or the last one just left), and back in when something shows (`Background.lua`).
 
