@@ -138,3 +138,19 @@ function Core.Smooth(texture)
   end
   return texture
 end
+
+---
+-- Growing animations go wrong in this game version: what they grow can
+-- become huge for a moment (a gold glow over half the screen). The game's
+-- own tracker animations keep their other steps but no longer grow.
+function Core.NoGrowing(group)
+  if not group or group.gftNoGrowing or not group.GetAnimations then return end
+  group.gftNoGrowing = true
+  for _, animation in ipairs({ group:GetAnimations() }) do
+    if animation:GetObjectType() == "Scale" then
+      if animation.SetScaleFrom then animation:SetScaleFrom(1, 1) end
+      if animation.SetScaleTo then animation:SetScaleTo(1, 1) end
+      if animation.SetScale then animation:SetScale(1, 1) end
+    end
+  end
+end

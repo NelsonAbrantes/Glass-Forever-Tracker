@@ -258,6 +258,7 @@ local function StylePoi(button)
   -- OnPlay: both are caught
   if button.AddAnim then
     local group = button.AddAnim
+    Core.NoGrowing(group)
     group:HookScript("OnPlay", function () group:Stop() end)
     hooksecurefunc(group, "Restart", function () group:Stop() end)
     hooksecurefunc(group, "Play", function () group:Stop() end)

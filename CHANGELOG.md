@@ -38,3 +38,5 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - Quest icons no longer go back to the game's art, and the gold ring no longer stays after accepting a quest (`Icons.lua`).
 - "Only quests in this zone" kept quests of nearby zones (The Barrens' quests in Mulgore): a quest of another zone now counts only if its marker is inside this zone's map (`ZoneFilter.lua`).
 - Quests tracked again by the zone filter no longer play the new quest animation, and a new quest reported twice no longer restarts it (`Skin.lua`, `ZoneFilter.lua`).
+- A gold flash over part of the screen, now and then on a zone change: the game's own glows on new quests could show for a moment before the addon hid them, and their growing animation goes wrong in this game version. Quests and objectives are now caught as soon as the game makes them, and the game's tracker animations no longer grow (`Skin.lua`, `Icons.lua`, `Core.lua`).
+- Abandoning the last quest shown didn't turn it to dust: the tracker hid right away and took the dust with it. The dust is now drawn over the tracker, not inside it (`Dust.lua`).

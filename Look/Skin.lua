@@ -118,8 +118,9 @@ local function PlayGlass(owner, anchor, kind)
   anim.gftLine:SetVertexColor(r, g, b)
   if anim.gftShine then
     -- Shine as tall as the text, passing over its whole width
-    anim.gftShine:SetSize(70, math.max(12, anchor:GetHeight()))
-    anim.gftMove:SetOffset(math.max(100, anchor:GetWidth()), 0)
+    -- (capped: a text being laid out can report a wild size for a moment)
+    anim.gftShine:SetSize(70, math.min(40, math.max(12, anchor:GetHeight())))
+    anim.gftMove:SetOffset(math.min(600, math.max(100, anchor:GetWidth())), 0)
   end
   anim:Stop()
   anim:Play()
@@ -201,6 +202,8 @@ local lastAdded = {} -- quest -> when it was last reported new
 local function HookBlock(block)
   if hookedBlocks[block] then return end
   hookedBlocks[block] = true
+  Core.NoGrowing(block.AddAnim)
+  Core.NoGrowing(block.TurnInAnim)
   SetGlow(block.HeaderGlow)
   local function Play(added)
     SetGlow(block.HeaderGlow)
@@ -251,6 +254,8 @@ end
 local function HookLine(line)
   if hookedLines[line] then return end
   hookedLines[line] = true
+  Core.NoGrowing(line.GlowAnim)
+  Core.NoGrowing(line.CheckAnim)
   SetGlow(line.Glow)
   if line.GlowAnim then
     local function Play()
@@ -337,6 +342,7 @@ local function HookAddAnimation(header)
   local anim = header and header.AddAnim
   if not anim or anim.gftHooked then return end
   anim.gftHooked = true
+  Core.NoGrowing(anim)
 
   local function Replace()
     local profile = Profile()
@@ -442,6 +448,21 @@ local function HookModules()
   end
   for _, module in ipairs(tracker.modules or {}) do HookModule(module) end
   HookQuestAnimations()
+
+  -- Every quest and objective line, from any section, as soon as the game
+  -- makes it (and again when it lays it out), before anything is drawn. A
+  -- new one could otherwise show the game's own glow for a moment, which
+  -- grows huge in this game version: a gold flash over the screen, after a
+  -- zone change put many quests back at once.
+  local blockMixin, lineMixin = _G.ObjectiveTrackerAnimBlockMixin, _G.ObjectiveTrackerAnimLineMixin
+  local function OnBlock(block) if block and block.AddAnim then HookBlock(block) end end
+  local function OnLine(line) if line and line.GlowAnim then HookLine(line) end end
+  for _, method in ipairs({ "OnLoad", "OnLayout" }) do
+    if blockMixin and blockMixin[method] then hooksecurefunc(blockMixin, method, OnBlock) end
+  end
+  for _, method in ipairs({ "OnLoad", "SetState" }) do
+    if lineMixin and lineMixin[method] then hooksecurefunc(lineMixin, method, OnLine) end
+  end
 
   -- A safety check now and then: art the game shows again, sections or
   -- quests missed

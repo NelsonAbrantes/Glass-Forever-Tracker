@@ -94,9 +94,22 @@ local turnedIn = {}
 ----
 -- The dust
 
-local stage = CreateFrame("Frame", nil, tracker)
+-- On the screen itself, placed over the tracker but not inside it: when the
+-- abandoned quest was the last one shown, the tracker hides (or fades out)
+-- right away, and the dust went with it
+local stage = CreateFrame("Frame", nil, _G.UIParent)
 stage:SetAllPoints(tracker)
-stage:SetFrameLevel(tracker:GetFrameLevel() + 20)
+
+-- Same layer and size as the tracker, worked out when the dust starts (Edit
+-- Mode can change them)
+local function PlaceStage()
+  stage:SetFrameStrata(tracker:GetFrameStrata())
+  stage:SetFrameLevel(tracker:GetFrameLevel() + 20)
+  local scale = tracker:GetEffectiveScale() / _G.UIParent:GetEffectiveScale()
+  if scale > 0 then stage:SetScale(scale) end
+  stage:ClearAllPoints()
+  stage:SetAllPoints(tracker)
+end
 
 local texts, particles = {}, {}
 local active = {}   -- running effects: { start, items }
@@ -238,6 +251,7 @@ local function VisibleLength(value)
 end
 
 local function Snap(picture)
+  PlaceStage()
   local effect = { start = GetTime(), items = {} }
   for i, item in ipairs(picture.items) do
     usedTexts = usedTexts + 1
@@ -280,10 +294,15 @@ events:SetScript("OnEvent", function (_, event, questID)
     if turned and GetTime() - turned < 2 then return end
     -- Abandoned: the game takes it out of the tracker a moment after this,
     -- so the picture is taken now, while it's still there
-    if Core:Animates() then
+    if not Core:Animates() then
+      Core:AnimLog("quest removed, no dust: animations aren't Glass", tostring(questID))
+    else
       -- A problem here shows once and never stops the game's own handling
       local ok, problem = pcall(function ()
+        local block = FindBlock(questID)
         local picture = TakePicture(questID)
+        Core:AnimLog("quest removed", tostring(questID), block and "shown" or "not in the tracker",
+          picture and "dust" or "no dust")
         if picture then Snap(picture) end
       end)
       if not ok then geterrorhandler()(problem) end
