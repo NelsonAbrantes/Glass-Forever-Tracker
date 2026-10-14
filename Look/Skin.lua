@@ -213,6 +213,7 @@ local function HookBlock(block)
         Core:AnimLog("new quest again, ignored", tostring(block.id))
         return
       end
+      if Core.DropOld then Core.DropOld(lastAdded, now, 30) end
       lastAdded[block.id] = now
       -- Tracked again by "Only quests in this zone", not a new quest: a
       -- quieter entrance (Animations.lua)

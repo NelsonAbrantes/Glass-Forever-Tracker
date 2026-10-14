@@ -25,6 +25,8 @@ Versions are named `X.Y.Z-forever`: `0.x` while in beta.
 - Lighter in fights: the "Quests 12/25" title is only set again when the count changes, the complete sound reuses its tables (and does nothing when off), and dimmed objectives are only touched when they change (`Extras.lua`, `Sounds.lua`).
 - The "Gold" color is brighter and yellower, so it stands apart from bronze (`Core.lua`).
 - The Glass background fades out when the tracker has nothing in it (no quests in this zone, or the last one just left), and back in when something shows (`Background.lua`).
+- With the main title hidden, the background starts at the first section and the empty title room no longer shows the tracker on mouse over (`Background.lua`, `Fade.lua`).
+- Less garbage: quest icons keep their lists of the game's art, and the short "recently" lists (accepted, tracked again, reported new) drop old entries (`Icons.lua`, `ZoneFilter.lua`, `Skin.lua`).
 
 ### Fixed
 - Switching the quest name color back to "Game colors" now restores the game's colors (and inline colors) right away (`Icons.lua`).

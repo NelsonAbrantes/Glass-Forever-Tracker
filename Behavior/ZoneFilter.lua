@@ -51,8 +51,20 @@ local pendingCombat = false
 -- Tracks a quest again. The game then shows it as if it were new: noted, so
 -- it comes in without the new quest animations (Skin.lua)
 Core.rewatched = {}
+
+-- Old entries of a "when" list are dropped, so it doesn't keep growing over
+-- a session
+local function DropOld(list, now, age)
+  for key, when in pairs(list) do
+    if now - when > age then list[key] = nil end
+  end
+end
+Core.DropOld = DropOld
+
 local function Watch(questID)
-  Core.rewatched[questID] = GetTime()
+  local now = GetTime()
+  DropOld(Core.rewatched, now, 30)
+  Core.rewatched[questID] = now
   C_QuestLog.AddQuestWatch(questID)
 end
 
@@ -219,7 +231,10 @@ events:SetScript("OnEvent", function (_, event, ...)
     -- (questID), or (quest log index, questID) in some game versions
     local first, second = ...
     local questID = second or first
-    if questID then accepted[questID] = GetTime() end
+    if questID then
+      DropOld(accepted, GetTime(), 60)
+      accepted[questID] = GetTime()
+    end
   end
   if event == "PLAYER_REGEN_ENABLED" then
     if pendingCombat then

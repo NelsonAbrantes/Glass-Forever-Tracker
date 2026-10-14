@@ -193,16 +193,29 @@ local function Animate(button, key, on)
   end
 end
 
+-- The game's art of a quest icon, as lists made once per icon (this runs
+-- many times a second as the game updates its icons; new lists each time
+-- were garbage)
+local function PoiParts(button)
+  if not button.gftParts then
+    button.gftFadedParts = { button.NormalTexture, button.PushedTexture }
+    button.gftLitParts = { button.HighlightTexture, button.Glow, button.Display }
+    button.gftParts = { button.NormalTexture, button.PushedTexture, button.HighlightTexture, button.Glow, button.Display }
+  end
+  return button.gftParts
+end
+
 local function UpdatePoi(button)
   local icon = GlassLook() and PoiIcon(button:GetStyle())
   local styled = icon and true or false
   button.gftStyled = styled
 
+  PoiParts(button)
   local buttonAlpha = button.CalculateButtonAlpha and button:CalculateButtonAlpha() or 1
-  for _, region in ipairs({ button.NormalTexture, button.PushedTexture }) do
+  for _, region in ipairs(button.gftFadedParts) do
     region:SetAlpha(styled and 0 or buttonAlpha)
   end
-  for _, region in ipairs({ button.HighlightTexture, button.Glow, button.Display }) do
+  for _, region in ipairs(button.gftLitParts) do
     region:SetAlpha(styled and 0 or 1)
   end
 
@@ -266,7 +279,7 @@ local function EnforcePoi(button)
     return
   end
   if not wanted then return end
-  for _, region in ipairs({ button.NormalTexture, button.PushedTexture, button.HighlightTexture, button.Glow, button.Display }) do
+  for _, region in ipairs(PoiParts(button)) do
     if region and region:GetAlpha() > 0.001 then
       UpdatePoi(button)
       return

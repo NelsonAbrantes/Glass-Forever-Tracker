@@ -107,8 +107,8 @@ local function OtherWindowOnTop()
 end
 
 -- The mouse over the quests: only the part with something shown (the
--- tracker's box goes on, empty, down to its Edit Mode height), with nothing
--- else on top
+-- tracker's box goes on, empty, down to its Edit Mode height, and with the
+-- title hidden its room at the top stays empty too), with nothing else on top
 local function MouseOverQuests()
   if not tracker:IsVisible() then return false end
   local empty = 0
@@ -116,7 +116,8 @@ local function MouseOverQuests()
   if contentHeight then
     empty = math.max(0, tracker:GetHeight() - contentHeight)
   end
-  return tracker:IsMouseOver(8, empty - 8, -8, 8) and not OtherWindowOnTop()
+  local topInset = Core.background.contentTopInset or 0
+  return tracker:IsMouseOver(8 - topInset, empty - 8, -8, 8) and not OtherWindowOnTop()
 end
 
 -- Moves towards the target over the fade in / fade out duration

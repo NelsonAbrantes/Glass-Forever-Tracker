@@ -74,24 +74,43 @@ local function ContentBottom(tracker)
   return bottom
 end
 
+-- The highest point with something shown: the tracker's top, or with its
+-- title hidden the top of the first section (the game keeps the title's room
+-- empty, and changing that would mean changing the game's own layout values)
+local function ContentTop(tracker)
+  if not Core.db.profile.hideMainHeader then return tracker:GetTop() end
+  local top
+  for _, module in ipairs(tracker.modules or {}) do
+    if module:IsShown() and module:GetHeight() > 1 then
+      local moduleTop = module:GetTop()
+      if moduleTop and (not top or moduleTop > top) then top = moduleTop end
+    end
+  end
+  return top or tracker:GetTop()
+end
+
 function background:UpdateSize()
   local tracker = self.tracker
-  local top, bottom = tracker:GetTop(), ContentBottom(tracker)
+  local trackerTop = tracker:GetTop()
+  local top, bottom = ContentTop(tracker), ContentBottom(tracker)
   presenceTarget = (top and bottom) and 1 or 0
   if presence ~= presenceTarget then self.fading = true end
-  if not top or not bottom then
+  if not top or not bottom or not trackerTop then
     self.contentHeight = 0 -- nothing for the mouse to be over (Fade.lua)
     return
   end
 
-  local height = math.floor(top - bottom + 0.5)
-  if height == self.contentHeight then return end
-  self.contentHeight = height
+  -- From the tracker's top: the empty room above the content, and down to
+  -- the end of the content (Fade.lua uses both for the mouse)
+  local inset = math.floor(trackerTop - top + 0.5)
+  local height = math.floor(trackerTop - bottom + 0.5)
+  if height == self.contentHeight and inset == self.contentTopInset then return end
+  self.contentHeight, self.contentTopInset = height, inset
 
   self:ClearAllPoints()
   -- How far it reaches past the text (Options: background size)
   local pad = Core.db.profile.backgroundSize
-  self:SetPoint("TOPLEFT", tracker, "TOPLEFT", -pad, pad)
+  self:SetPoint("TOPLEFT", tracker, "TOPLEFT", -pad, pad - inset)
   self:SetPoint("BOTTOMRIGHT", tracker, "TOPRIGHT", pad, -(height + pad))
 end
 
